@@ -1,0 +1,13 @@
+{
+    "name": "v2",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "build": "tsc --build --verbose",
+        "clean": "tsc --build --clean --verbose"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "typescript": "^4.2.4"
+    }
+}
