@@ -1,21 +1,18 @@
 {
-  "compilerOptions": {
-    "experimentalDecorators": true,
-    "target": "es6",
-    "module": "commonjs",
-    "rootDir": "./",
-    "outDir": "./build",
-    "esModuleInterop": true,
-    "strict": true,
-    "allowJs": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "jsx": "preserve"
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "components/*.ts"],
-  "exclude": ["node_modules"]
+    "compilerOptions": {
+        "lib": ["es5", "es2015.promise", "dom", "es2015"],
+        "target": "es2015",
+        "module": "es2015",
+        "typeRoots": ["node_modules/@types"],
+        "moduleResolution": "node",
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "allowSyntheticDefaultImports": true,
+        "declaration": false,
+        "sourceMap": true,
+        "rootDir": "./",
+        "outDir": "./build"
+    },
+    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "components/*.ts"],
+    "exclude": ["node_modules"]
 }

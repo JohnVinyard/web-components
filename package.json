@@ -2,9 +2,10 @@
     "name": "v2",
     "version": "0.1.0",
     "private": true,
+    "type": "module",
     "scripts": {
         "build": "tsc --build --verbose",
-        "clean": "tsc --build --clean --verbose"
+        "clean": "tsc --build --clean"
     },
     "dependencies": {},
     "devDependencies": {
