@@ -1,142 +1,97 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 class Interval {
-    constructor(public readonly start: number, public readonly end: number) {
+    constructor(start, end) {
+        this.start = start;
+        this.end = end;
         if (end < start) {
-            throw new Error(
-                `end must be greater than start, but got [${start}-${end}]`
-            );
+            throw new Error(`end must be greater than start, but got [${start}-${end}]`);
         }
     }
-
-    public static unit(): Interval {
+    static unit() {
         return new Interval(0, 1);
     }
-
-    public get range(): number {
+    get range() {
         return this.end - this.start;
     }
-
-    public pointToPercentage(location: number) {
+    pointToPercentage(location) {
         const relative = location - this.start;
         return relative / this.range;
     }
-
-    public percentageToPoint(percentage: number) {
+    percentageToPoint(percentage) {
         return this.start + percentage * this.range;
     }
 }
-
-interface TimeUnits {
-    seconds: number;
-    samples: number;
-    pixels: number;
-}
-
-interface LoudnessUnits {
-    raw: number;
-    pixels: number;
-}
-
-class IntervalMapping<T> {
-    constructor(private readonly intervals: Record<keyof T, Interval>) {}
-
-    public map(location: number, from: keyof T, to: keyof T) {
+class IntervalMapping {
+    constructor(intervals) {
+        this.intervals = intervals;
+    }
+    map(location, from, to) {
         const fromInterval = this.intervals[from];
         const toInterval = this.intervals[to];
-
         const percentage = fromInterval.pointToPercentage(location);
         const newLocation = toInterval.percentageToPoint(percentage);
         return newLocation;
     }
 }
-
-const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
-    const resp = await fetch(url);
+const fetchBinary = (url) => __awaiter(this, void 0, void 0, function* () {
+    const resp = yield fetch(url);
     return resp.arrayBuffer();
-};
-
+});
 const audioCache = {};
-
-const fetchAudio = async (
-    url: string,
-    context: AudioContext
-): Promise<AudioBuffer> => {
+const fetchAudio = (url, context) => __awaiter(this, void 0, void 0, function* () {
     const cached = audioCache[url];
     if (cached !== undefined) {
         return cached;
     }
-
     const audioBufferPromise = fetchBinary(url).then(function (data) {
-        return new Promise<AudioBuffer>(function (resolve, reject) {
-            context.decodeAudioData(
-                data,
-                (buffer) => resolve(buffer),
-                (error) => reject(error)
-            );
+        return new Promise(function (resolve, reject) {
+            context.decodeAudioData(data, (buffer) => resolve(buffer), (error) => reject(error));
         });
     });
     audioCache[url] = audioBufferPromise;
     return audioBufferPromise;
-};
-
-const playAudio = async (
-    url: string,
-    context: AudioContext,
-    start?: number,
-    duration?: number
-): Promise<AudioBufferSourceNode> => {
-    const audioBuffer = await fetchAudio(url, context);
+});
+const playAudio = (url, context, start, duration) => __awaiter(this, void 0, void 0, function* () {
+    const audioBuffer = yield fetchAudio(url, context);
     const source = context.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(context.destination);
     source.start(0, start, duration);
     return source;
-};
-
+});
 // @ts-ignore
 const context = new (window.AudioContext || window.webkitAudioContext)();
-
 /**
  * data url
  */
-
-const safeParseInt = (
-    value: string | null | undefined,
-    defaultValue: number
-): number => {
+const safeParseInt = (value, defaultValue) => {
     if (value === null || value === undefined) {
         return defaultValue;
     }
-
     const parsed = parseInt(value);
     return isNaN(parsed) ? defaultValue : parsed;
 };
-
-const clamp = (value: number, min: number, max: number): number => {
+const clamp = (value, min, max) => {
     if (value < min) {
         return min;
     }
-
     if (value > max) {
         return max;
     }
-
     return value;
 };
-
 class AudioView extends HTMLElement {
-    public src: string | null;
-    public buffer: AudioBuffer | null;
-    public height: string | null;
-    public samples: string | null;
-    public scale: string | null;
-
-    private isPlaying: boolean = false;
-    private playingBuffer: AudioBufferSourceNode | null;
-    private timeoutHandle: number | null;
-    private currentEndTimeSeconds: number | null;
-
     constructor() {
         super();
+        this.isPlaying = false;
         this.src = null;
         this.buffer = null;
         this.height = '200';
@@ -147,88 +102,46 @@ class AudioView extends HTMLElement {
         this.timeoutHandle = null;
         this.currentEndTimeSeconds = null;
     }
-
-    private deriveCurrentEndTimeSeconds(
-        intervalMapping: IntervalMapping<TimeUnits>,
-        container: HTMLDivElement
-    ) {
+    deriveCurrentEndTimeSeconds(intervalMapping, container) {
         const currentPixelPosition = container.scrollLeft;
         const currentVisiblePixels = this.parentElement.clientWidth;
         const endPixelPosition = currentPixelPosition + currentVisiblePixels;
-
-        const startTimeSeconds = intervalMapping.map(
-            currentPixelPosition,
-            'pixels',
-            'seconds'
-        );
-
+        const startTimeSeconds = intervalMapping.map(currentPixelPosition, 'pixels', 'seconds');
         if (this.buffer !== null) {
             const totalDuration = this.buffer.duration;
-            this.currentEndTimeSeconds = Math.min(
-                intervalMapping.map(endPixelPosition, 'pixels', 'seconds'),
-                totalDuration
-            );
-        } else {
-            this.currentEndTimeSeconds = intervalMapping.map(
-                endPixelPosition,
-                'pixels',
-                'seconds'
-            );
+            this.currentEndTimeSeconds = Math.min(intervalMapping.map(endPixelPosition, 'pixels', 'seconds'), totalDuration);
         }
-
-        console.log(
-            `Current start seconds is ${startTimeSeconds} and current end is ${
-                this.currentEndTimeSeconds
-            } for a total duration of ${
-                this.currentEndTimeSeconds - startTimeSeconds
-            } seconds`
-        );
+        else {
+            this.currentEndTimeSeconds = intervalMapping.map(endPixelPosition, 'pixels', 'seconds');
+        }
+        console.log(`Current start seconds is ${startTimeSeconds} and current end is ${this.currentEndTimeSeconds} for a total duration of ${this.currentEndTimeSeconds - startTimeSeconds} seconds`);
     }
-
-    private render() {
-        let shadow: ShadowRoot | null = this.shadowRoot;
-
+    render() {
+        var _a, _b, _c, _d, _e, _f;
+        let shadow = this.shadowRoot;
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
         }
-
-        const duration = this.buffer?.duration ?? 0;
-
+        const duration = (_b = (_a = this.buffer) === null || _a === void 0 ? void 0 : _a.duration) !== null && _b !== void 0 ? _b : 0;
         const secondsInterval = new Interval(0, duration);
-
-        const samplerate = this.buffer?.sampleRate ?? 44100;
-
+        const samplerate = (_d = (_c = this.buffer) === null || _c === void 0 ? void 0 : _c.sampleRate) !== null && _d !== void 0 ? _d : 44100;
         const totalSamples = duration * samplerate;
-
         const samplesInterval = new Interval(0, totalSamples);
-
         console.log(`RENDERING WITH ${this.samples}`);
-
-        const samplesPerBar = Math.floor(
-            parseInt(this.scale) * safeParseInt(this.samples, 4096)
-        );
-
+        const samplesPerBar = Math.floor(parseInt(this.scale) * safeParseInt(this.samples, 4096));
         const totalPixels = Math.round(totalSamples / samplesPerBar);
-
         const pixelsInterval = new Interval(0, totalPixels);
-
-        const intervalMapping = new IntervalMapping<TimeUnits>({
+        const intervalMapping = new IntervalMapping({
             seconds: secondsInterval,
             samples: samplesInterval,
             pixels: pixelsInterval,
         });
-
         const loudnessInterval = Interval.unit();
-        const pixelHeightInterval = new Interval(
-            0,
-            safeParseInt(this.height, 200)
-        );
-
-        const loudnessMapping = new IntervalMapping<LoudnessUnits>({
+        const pixelHeightInterval = new Interval(0, safeParseInt(this.height, 200));
+        const loudnessMapping = new IntervalMapping({
             raw: loudnessInterval,
             pixels: pixelHeightInterval,
         });
-
         // TODO: There needs to be a separate canvas container
         shadow.innerHTML = `
             <style>
@@ -283,142 +196,93 @@ class AudioView extends HTMLElement {
                 </div>
             </div>
         `;
-
-        const container: HTMLDivElement = shadow.querySelector(
-            '.audio-view-container'
-        );
-        const canvas: HTMLCanvasElement =
-            shadow.querySelector('.audio-view-canvas');
-
+        const container = shadow.querySelector('.audio-view-container');
+        const canvas = shadow.querySelector('.audio-view-canvas');
         this.deriveCurrentEndTimeSeconds(intervalMapping, container);
-
-        container.addEventListener('scroll', (event: any) => {
+        container.addEventListener('scroll', (event) => {
             this.deriveCurrentEndTimeSeconds(intervalMapping, container);
         });
-
-        container.addEventListener('click', (event: PointerEvent) => {
+        container.addEventListener('click', (event) => {
             const clickedPixel = event.offsetX;
-            const startSeconds = intervalMapping.map(
-                clickedPixel,
-                'pixels',
-                'seconds'
-            );
+            const startSeconds = intervalMapping.map(clickedPixel, 'pixels', 'seconds');
             this.playAudio(this.src, startSeconds);
         });
-
         shadow
             .querySelector('.audio-view-zoom-in')
-            .addEventListener('click', (event: PointerEvent) => {
-                event.stopPropagation();
-                const raw = safeParseInt(this.scale, 1) * 0.5;
-                const clamped = clamp(raw, 1, 8);
-                this.setAttribute('scale', clamped.toString());
-            });
-
+            .addEventListener('click', (event) => {
+            event.stopPropagation();
+            const raw = safeParseInt(this.scale, 1) * 0.5;
+            const clamped = clamp(raw, 1, 8);
+            this.setAttribute('scale', clamped.toString());
+        });
         shadow
             .querySelector('.audio-view-zoom-out')
-            .addEventListener('click', (event: PointerEvent) => {
-                event.stopPropagation();
-                const raw = safeParseInt(this.scale, 1) * 2;
-                const clamped = clamp(raw, 1, 8);
-                this.setAttribute('scale', clamped.toString());
-            });
-
-        const control = shadow.querySelector('.audio-view-control');
-
-        control.addEventListener('click', async (event: PointerEvent) => {
+            .addEventListener('click', (event) => {
             event.stopPropagation();
-
+            const raw = safeParseInt(this.scale, 1) * 2;
+            const clamped = clamp(raw, 1, 8);
+            this.setAttribute('scale', clamped.toString());
+        });
+        const control = shadow.querySelector('.audio-view-control');
+        control.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
+            event.stopPropagation();
             this.isPlaying = !this.isPlaying;
             control.innerHTML = this.isPlaying ? 'stop' : 'play';
             clearTimeout(this.timeoutHandle);
-
             if (this.isPlaying) {
                 const startPositionPixels = container.scrollLeft;
-                const startTimeSeconds = intervalMapping.map(
-                    startPositionPixels,
-                    'pixels',
-                    'seconds'
-                );
+                const startTimeSeconds = intervalMapping.map(startPositionPixels, 'pixels', 'seconds');
                 this.playAudio(this.src, startTimeSeconds);
-            } else if (this.playingBuffer !== null) {
+            }
+            else if (this.playingBuffer !== null) {
                 this.playingBuffer.stop();
                 this.playingBuffer = null;
             }
-        });
-
-        const audioData = this.buffer?.getChannelData(0) ?? new Float32Array(0);
-
+        }));
+        const audioData = (_f = (_e = this.buffer) === null || _e === void 0 ? void 0 : _e.getChannelData(0)) !== null && _f !== void 0 ? _f : new Float32Array(0);
         const drawContext = canvas.getContext('2d');
         drawContext.strokeStyle = '#000000';
         drawContext.fillStyle = '#000000';
-
         const midline = canvas.clientHeight / 2;
-
         for (let i = 0; i < totalSamples; i += samplesPerBar) {
             const sampleValue = Math.abs(audioData[i]);
             // const sampleHeight = sampleValue * canvasHeight;
-            const sampleHeight = loudnessMapping.map(
-                sampleValue,
-                'raw',
-                'pixels'
-            );
+            const sampleHeight = loudnessMapping.map(sampleValue, 'raw', 'pixels');
             const top = midline - sampleHeight / 2;
             const xLocation = intervalMapping.map(i, 'samples', 'pixels');
             drawContext.fillRect(xLocation, top, 1, sampleHeight);
         }
     }
-
-    public connectedCallback() {
+    connectedCallback() {
         this.render();
     }
-
-    public async playAudio(
-        url: string,
-        startSeconds: number,
-        durationSeconds: number = 5
-    ) {
-        const duration =
-            this.currentEndTimeSeconds !== null
+    playAudio(url, startSeconds, durationSeconds = 5) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const duration = this.currentEndTimeSeconds !== null
                 ? this.currentEndTimeSeconds - startSeconds
                 : durationSeconds;
-
-        console.log(`play duration is ${duration} seconds`);
-
-        // start at second 1 and play for 5 seconds
-        this.playingBuffer = await playAudio(
-            url,
-            context,
-            startSeconds,
-            duration
-        );
-        this.isPlaying = true;
-        this.shadowRoot.querySelector('.audio-view-control').innerHTML = 'stop';
-
-        this.timeoutHandle = setTimeout(() => {
-            this.isPlaying = false;
-            this.playingBuffer = null;
-            this.shadowRoot.querySelector('.audio-view-control').innerHTML =
-                'play';
-        }, duration * 1000);
+            console.log(`play duration is ${duration} seconds`);
+            // start at second 1 and play for 5 seconds
+            this.playingBuffer = yield playAudio(url, context, startSeconds, duration);
+            this.isPlaying = true;
+            this.shadowRoot.querySelector('.audio-view-control').innerHTML = 'stop';
+            this.timeoutHandle = setTimeout(() => {
+                this.isPlaying = false;
+                this.playingBuffer = null;
+                this.shadowRoot.querySelector('.audio-view-control').innerHTML =
+                    'play';
+            }, duration * 1000);
+        });
     }
-
-    public static get observedAttributes(): (keyof AudioView)[] {
+    static get observedAttributes() {
         return ['src', 'scale', 'height', 'samples'];
     }
-
-    public attributeChangedCallback(
-        property: string,
-        oldValue: string,
-        newValue: string
-    ) {
+    attributeChangedCallback(property, oldValue, newValue) {
         console.log(`Setting ${property} from ${oldValue} to ${newValue}`);
         if (newValue === oldValue) {
             return;
         }
-
         this[property] = newValue;
-
         if (property === 'src') {
             fetchAudio(newValue, context).then((buf) => {
                 this.buffer = buf;
@@ -426,12 +290,11 @@ class AudioView extends HTMLElement {
             });
             return;
         }
-
         if (property === 'scale') {
             this.render();
             return;
         }
     }
 }
-
 window.customElements.define('audio-view', AudioView);
+//# sourceMappingURL=audioview.js.map
