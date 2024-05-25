@@ -5,10 +5,43 @@
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Web Component Demo</title>
         <script src="build/components/audioview.js"></script>
+        <script src="build/components/scatterplot.js"></script>
     </head>
 
     <body>
-        <h1>Page Title</h1>
+        <h1>Web Component Demo</h1>
+
+        <div>
+            <scatter-plot 
+                width="500"
+                height="500"
+                radius="0.5"
+                points='[
+                    {
+                        "x": -10,
+                        "y": 20,
+                        "url": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
+                        "startSeconds": 0,
+                        "durationSeconds": 1
+                    },
+                    {
+                        "x": 0,
+                        "y": 0,
+                        "url": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
+                        "startSeconds": 0,
+                        "durationSeconds": 1
+                    },
+                    {
+                        "x": 10,
+                        "y": 11,
+                        "url": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
+                        "startSeconds": 1,
+                        "durationSeconds": 2
+                    }
+                ]'
+             />
+        </div>
+
         <audio-view
             src="https://music-net.s3.amazonaws.com/1727"
             height="300"
