@@ -1,3 +1,5 @@
+import { playAudio, context } from './audioview';
+
 interface Point {
     x: number;
     y: number;
@@ -6,7 +8,7 @@ interface Point {
     durationSeconds: number;
 }
 
-class ScatterPlot extends HTMLElement {
+export class ScatterPlot extends HTMLElement {
     public points: string | null;
     public width: string | null;
     public height: string | null;

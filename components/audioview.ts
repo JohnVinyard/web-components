@@ -78,7 +78,7 @@ const fetchAudio = async (
     return audioBufferPromise;
 };
 
-const playAudio = async (
+export const playAudio = async (
     url: string,
     context: AudioContext,
     start?: number,
@@ -93,7 +93,7 @@ const playAudio = async (
 };
 
 // @ts-ignore
-const context = new (window.AudioContext || window.webkitAudioContext)();
+export const context = new (window.AudioContext || window.webkitAudioContext)();
 
 /**
  * data url
@@ -123,7 +123,7 @@ const clamp = (value: number, min: number, max: number): number => {
     return value;
 };
 
-class AudioView extends HTMLElement {
+export class AudioView extends HTMLElement {
     public src: string | null;
     public buffer: AudioBuffer | null;
     public height: string | null;
@@ -395,6 +395,7 @@ class AudioView extends HTMLElement {
         this.isPlaying = true;
         this.shadowRoot.querySelector('.audio-view-control').innerHTML = 'stop';
 
+        // @ts-ignore
         this.timeoutHandle = setTimeout(() => {
             this.isPlaying = false;
             this.playingBuffer = null;

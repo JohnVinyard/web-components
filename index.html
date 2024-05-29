@@ -4,15 +4,22 @@
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>Web Component Demo</title>
-        <script src="build/components/audioview.js"></script>
-        <script src="build/components/scatterplot.js"></script>
+        <script src="build/components/bundle.js"></script>
     </head>
 
     <body>
         <h1>Web Component Demo</h1>
 
         <div>
-            <scatter-plot 
+            <tensor-view
+                height="200"
+                width="500"
+                src="data:application/npy;base64,k05VTVBZAQB2AHsnZGVzY3InOiAnPGY4JywgJ2ZvcnRyYW5fb3JkZXInOiBGYWxzZSwgJ3NoYXBlJzogKDMsIDMsIDMpLCB9ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAo46YvQ+S7ZP45a6wgQO+K/KSGJ8tKQ1r8t58O1gT7xv5rAoIQu1eg/IrXanyBE8z+htyeKKkjXP10rDyHSN8K/HNRwmms5/z+3tZeoY6jmv6dY6d7JKrE/PB3gQf+b0T+c4Y2DS/Lkv57ScBKvhNA/nbMn2x7Y1b+aeSfwlqz6v8+zeanRzc6/JJ25yzRlpj/R2mAz+X/zv1vPiIO3ltA/wyyrW8Gq4j/mWRdQRcjkv1ozbpUrBfC/uHbxzJ0s6j8Q56tI6aflv7cXukl0Qem/QLbpl3QL8b8="
+            />
+        </div>
+
+        <div>
+            <scatter-plot
                 width="500"
                 height="500"
                 radius="0.5"
@@ -39,7 +46,7 @@
                         "durationSeconds": 2
                     }
                 ]'
-             />
+            />
         </div>
 
         <audio-view
