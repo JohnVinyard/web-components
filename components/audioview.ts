@@ -175,14 +175,6 @@ export class AudioView extends HTMLElement {
                 'seconds'
             );
         }
-
-        console.log(
-            `Current start seconds is ${startTimeSeconds} and current end is ${
-                this.currentEndTimeSeconds
-            } for a total duration of ${
-                this.currentEndTimeSeconds - startTimeSeconds
-            } seconds`
-        );
     }
 
     private render() {
@@ -201,8 +193,6 @@ export class AudioView extends HTMLElement {
         const totalSamples = duration * samplerate;
 
         const samplesInterval = new Interval(0, totalSamples);
-
-        console.log(`RENDERING WITH ${this.samples}`);
 
         const samplesPerBar = Math.floor(
             parseInt(this.scale) * safeParseInt(this.samples, 4096)
@@ -383,8 +373,6 @@ export class AudioView extends HTMLElement {
                 ? this.currentEndTimeSeconds - startSeconds
                 : durationSeconds;
 
-        console.log(`play duration is ${duration} seconds`);
-
         // start at second 1 and play for 5 seconds
         this.playingBuffer = await playAudio(
             url,
@@ -413,7 +401,6 @@ export class AudioView extends HTMLElement {
         oldValue: string,
         newValue: string
     ) {
-        console.log(`Setting ${property} from ${oldValue} to ${newValue}`);
         if (newValue === oldValue) {
             return;
         }
