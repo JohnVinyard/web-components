@@ -233,12 +233,8 @@ export class AudioView extends HTMLElement {
 
                 .audio-view-controls-container {
                     position: absolute;
-                    top: 10px;
-                    left: 10px;
-                }
-
-                .audio-view-controls {
-                    position: fixed;
+                    top: 10;
+                    left: 10;
                 }
 
                 .audio-view-button {
@@ -255,6 +251,7 @@ export class AudioView extends HTMLElement {
                 }
             </style>
             <div class="audio-view-container">
+
                 <div class="audio-view-controls-container">
                     <div class="audio-view-controls">
                         <div class="audio-view-button audio-view-zoom-out">-</div>
@@ -262,6 +259,7 @@ export class AudioView extends HTMLElement {
                         <div class="audio-view-button audio-view-control">play</div>
                     </div>
                 </div>
+
                 <canvas 
                     class="audio-view-canvas" 
                     width="${totalPixels.toFixed(0)}px" 
@@ -277,6 +275,7 @@ export class AudioView extends HTMLElement {
         const container: HTMLDivElement = shadow.querySelector(
             '.audio-view-container'
         );
+
         const canvas: HTMLCanvasElement =
             shadow.querySelector('.audio-view-canvas');
 
