@@ -129,6 +129,7 @@ export class AudioView extends HTMLElement {
     public height: string | null;
     public samples: string | null;
     public scale: string | null;
+    public controls: string | null;
 
     private isPlaying: boolean = false;
     private playingBuffer: AudioBufferSourceNode | null;
@@ -146,6 +147,15 @@ export class AudioView extends HTMLElement {
         this.playingBuffer = null;
         this.timeoutHandle = null;
         this.currentEndTimeSeconds = null;
+        this.controls = null;
+    }
+
+    private get showControls(): boolean {
+        if (this.controls === null || this.controls.toLowerCase() === 'false') {
+            return false;
+        }
+
+        return true;
     }
 
     private deriveCurrentEndTimeSeconds(
@@ -233,6 +243,7 @@ export class AudioView extends HTMLElement {
 
                 .audio-view-controls-container {
                     position: absolute;
+                    display: ${this.showControls ? 'block' : 'none'};
                     top: 10;
                     left: 10;
                 }
@@ -392,7 +403,7 @@ export class AudioView extends HTMLElement {
     }
 
     public static get observedAttributes(): (keyof AudioView)[] {
-        return ['src', 'scale', 'height', 'samples'];
+        return ['src', 'scale', 'height', 'samples', 'controls'];
     }
 
     public attributeChangedCallback(
@@ -415,6 +426,11 @@ export class AudioView extends HTMLElement {
         }
 
         if (property === 'scale') {
+            this.render();
+            return;
+        }
+
+        if (property === 'controls') {
             this.render();
             return;
         }
