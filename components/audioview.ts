@@ -235,7 +235,7 @@ export class AudioView extends HTMLElement {
                 .audio-view-container {
                     width: 100%;
                     height: ${this.height}px;
-                    overflow-x: auto;
+                    overflow-x: ${this.showControls ? 'auto' : 'hidden'};
                     overflow-y: hidden;
                     position: relative;
                     border: solid 1px #eee;
@@ -244,7 +244,6 @@ export class AudioView extends HTMLElement {
                 .audio-view-controls-container {
                     position: absolute;
                     display: ${this.showControls ? 'block' : 'none'};
-                    overflow-x: ${this.showControls ? 'auto' : 'hidden'};
                     top: 10;
                     left: 10;
                 }
