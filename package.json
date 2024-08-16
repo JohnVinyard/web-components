@@ -5,11 +5,13 @@
     "scripts": {
         "build": "tsc --build --verbose",
         "clean": "tsc --build --clean",
-        "build-webpack": "webpack"
+        "build-webpack": "webpack",
+        "build-all": "tsc --build --verbose && webpack"
     },
     "dependencies": {},
     "devDependencies": {
         "@types/three": "0.164.1",
+        "highlight.js": "11.10.0",
         "three": "0.164.1",
         "three-orbitcontrols-ts": "0.1.2",
         "ts-loader": "9.5.1",
