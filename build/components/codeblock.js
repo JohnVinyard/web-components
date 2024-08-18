@@ -20,8 +20,8 @@ export class CodeBlock extends HTMLElement {
                 <div>
                     <style>
                         pre {
-                            padding: 20px !important;
-                            line-height: 1em !important;
+                            padding: 30px !important;
+                            line-height: 0.7em !important;
                         }
                     </style>
                     <link
