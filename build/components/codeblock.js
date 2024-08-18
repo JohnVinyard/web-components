@@ -18,6 +18,12 @@ export class CodeBlock extends HTMLElement {
             // choose a theme from here: https://www.jsdelivr.com/package/npm/highlightjs-themes?tab=files
             shadow.innerHTML = `
                 <div>
+                    <style>
+                        pre {
+                            padding: 20px !important;
+                            line-height: 1em !important;
+                        }
+                    </style>
                     <link
                         rel="stylesheet"
                         href="https://cdn.jsdelivr.net/npm/highlightjs-themes@1.0.0/darkula.css"
