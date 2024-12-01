@@ -157,6 +157,9 @@ export class AudioView extends HTMLElement {
                     overflow-y: hidden;
                     position: relative;
                     border: solid 1px #eee;
+
+                    background: rgb(34,193,195);
+                    background: linear-gradient(0deg, rgba(200,200,200,0.5) 0%, rgba(255,255,255,0.5) 100%);
                 }
 
                 .audio-view-controls-container {
@@ -250,7 +253,6 @@ export class AudioView extends HTMLElement {
         const midline = canvas.clientHeight / 2;
         for (let i = 0; i < totalSamples; i += samplesPerBar) {
             const sampleValue = Math.abs(audioData[i]);
-            // const sampleHeight = sampleValue * canvasHeight;
             const sampleHeight = loudnessMapping.map(sampleValue, 'raw', 'pixels');
             const top = midline - sampleHeight / 2;
             const xLocation = intervalMapping.map(i, 'samples', 'pixels');

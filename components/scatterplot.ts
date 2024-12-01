@@ -6,6 +6,7 @@ interface Point {
     url: string;
     startSeconds: number;
     durationSeconds: number;
+    color: string | null;
 }
 
 export class ScatterPlot extends HTMLElement {
@@ -61,7 +62,9 @@ export class ScatterPlot extends HTMLElement {
                     ${points
                         .map(
                             (p) =>
-                                `<circle cx="${p.x}" cy="${p.y}" r="${this.radius}" />`
+                                `<circle cx="${p.x}" cy="${p.y}" r="${
+                                    this.radius
+                                }" fill="${p.color ?? 'rgb(0 0 0)'}" />`
                         )
                         .join('')}
             </svg>

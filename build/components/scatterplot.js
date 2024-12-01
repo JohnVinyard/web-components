@@ -38,7 +38,10 @@ export class ScatterPlot extends HTMLElement {
                 height="${this.height}" 
                 viewbox="${xMin} ${yMin} ${xSpan} ${ySpan}">
                     ${points
-            .map((p) => `<circle cx="${p.x}" cy="${p.y}" r="${this.radius}" />`)
+            .map((p) => {
+            var _a;
+            return `<circle cx="${p.x}" cy="${p.y}" r="${this.radius}" fill="${(_a = p.color) !== null && _a !== void 0 ? _a : 'rgb(0 0 0)'}" />`;
+        })
             .join('')}
             </svg>
         `;

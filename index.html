@@ -86,21 +86,23 @@ def func(x: torch.Tensor) -> torch.Tensor:
                     <scatter-plot
                         width="500"
                         height="500"
-                        radius="0.1"
+                        radius="1"
                         points='[
                             {
                                 "x": -10,
                                 "y": 20,
                                 "url": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
                                 "startSeconds": 0,
-                                "durationSeconds": 1
+                                "durationSeconds": 1,
+                                "color": "rgb(255 0 0)"
                             },
                             {
                                 "x": 0,
                                 "y": 0,
                                 "url": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
                                 "startSeconds": 0,
-                                "durationSeconds": 1
+                                "durationSeconds": 1,
+                                "color": "rgb(0 255 0)"
                             },
                             {
                                 "x": 10,
