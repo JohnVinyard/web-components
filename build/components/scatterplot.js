@@ -29,7 +29,7 @@ export class ScatterPlot extends HTMLElement {
         const ySpan = yMax - yMin;
         shadow.innerHTML = `
             <style>
-                circle {
+                circle, rect {
                     cursor: pointer;
                 }
             </style>
@@ -39,14 +39,16 @@ export class ScatterPlot extends HTMLElement {
                 viewbox="${xMin} ${yMin} ${xSpan} ${ySpan}">
                     ${points
             .map((p) => {
-            var _a;
-            return `<circle cx="${p.x}" cy="${p.y}" r="${this.radius}" fill="${(_a = p.color) !== null && _a !== void 0 ? _a : 'rgb(0 0 0)'}" />`;
+            var _a, _b;
+            return p.eventDuration
+                ? `<rect fill="${(_a = p.color) !== null && _a !== void 0 ? _a : 'rgb(0 0 0)'}" width="${xSpan}" height="${this.radius}" x="${p.x}" y="${p.y}" />`
+                : `<circle cx="${p.x}" cy="${p.y}" r="${this.radius}" fill="${(_b = p.color) !== null && _b !== void 0 ? _b : 'rgb(0 0 0)'}" />`;
         })
             .join('')}
             </svg>
         `;
         const svgContainer = shadow.querySelector('svg');
-        shadow.querySelectorAll('circle').forEach((element, index) => {
+        shadow.querySelectorAll('circle, rect').forEach((element, index) => {
             element.addEventListener('click', (event) => {
                 const point = points[index];
                 const animationValues = [

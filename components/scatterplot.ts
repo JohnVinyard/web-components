@@ -6,6 +6,7 @@ interface Point {
     url: string;
     startSeconds: number;
     durationSeconds: number;
+    eventDuration?: number;
     color: string | null;
 }
 
@@ -51,7 +52,7 @@ export class ScatterPlot extends HTMLElement {
 
         shadow.innerHTML = `
             <style>
-                circle {
+                circle, rect {
                     cursor: pointer;
                 }
             </style>
@@ -60,11 +61,16 @@ export class ScatterPlot extends HTMLElement {
                 height="${this.height}" 
                 viewbox="${xMin} ${yMin} ${xSpan} ${ySpan}">
                     ${points
-                        .map(
-                            (p) =>
-                                `<circle cx="${p.x}" cy="${p.y}" r="${
-                                    this.radius
-                                }" fill="${p.color ?? 'rgb(0 0 0)'}" />`
+                        .map((p) =>
+                            p.eventDuration
+                                ? `<rect fill="${
+                                      p.color ?? 'rgb(0 0 0)'
+                                  }" width="${xSpan}" height="${
+                                      this.radius
+                                  }" x="${p.x}" y="${p.y}" />`
+                                : `<circle cx="${p.x}" cy="${p.y}" r="${
+                                      this.radius
+                                  }" fill="${p.color ?? 'rgb(0 0 0)'}" />`
                         )
                         .join('')}
             </svg>
@@ -72,7 +78,7 @@ export class ScatterPlot extends HTMLElement {
 
         const svgContainer = shadow.querySelector('svg');
 
-        shadow.querySelectorAll('circle').forEach((element, index) => {
+        shadow.querySelectorAll('circle, rect').forEach((element, index) => {
             element.addEventListener('click', (event: PointerEvent) => {
                 const point = points[index];
 
