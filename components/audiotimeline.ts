@@ -68,10 +68,8 @@ export class AudioTimeline extends HTMLElement {
 
             const startY = (x: number) => {
                 const bh = barHeight(x);
-                const diff = elementHeight - bh;
-                return diff * 0.5;
+                return -(bh / 2);
             };
-            // TODO: rounder corners and pretty colors
 
             return `
                     <g>
@@ -90,8 +88,6 @@ export class AudioTimeline extends HTMLElement {
                     </g>
             `;
         };
-
-        console.log('DURATION', this.durationSeconds, this.duration);
 
         shadow.innerHTML = `
             <style>
