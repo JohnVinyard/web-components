@@ -22,8 +22,48 @@
         
     </head>
 
+    <!-- interface Event {
+        eventTime: number;
+        eventDuration: number;
+        eventEnvelope: number[];
+        audioUrl: string;
+        color: string;
+        y: number;
+        offset: number;
+    } -->
+
     <body>
         <h1>Web Component Demo</h1>
+
+        <div>
+            <h2>Audio Timeline</h2>
+            <audio-timeline
+                events='[
+                    {
+                        "eventTime": 1,
+                        "eventDuration": 1,
+                        "eventEnvelope": [0, 0.9, 0.99, 1.0, 0.8, 0.75, 0.5, 0.1, 0],
+                        "audioUrl": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
+                        "color": "#11229a",
+                        "y": 0.75,
+                        "offset": 0
+                    },
+                    {
+                        "eventTime": 8,
+                        "eventDuration": 2,
+                        "eventEnvelope": [0, 0.1, 0.2, 1, 0.1, 0.02, 0],
+                        "audioUrl": "https://one-laptop-per-child.s3.amazonaws.com/Berklee44v16/Analogsynth2_low.wav",
+                        "color": "#338834",
+                        "y": 0.2,
+                        "offset": 1
+                    }
+                ]'
+                duration="20"
+                width="800"
+                height="250"
+            ></audio-timeline>
+        </div>
+
         <div>
             <h2>Citation</h2>
             <citation-block
