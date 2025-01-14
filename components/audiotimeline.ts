@@ -102,7 +102,6 @@ export class AudioTimeline extends HTMLElement {
             <svg 
                 xmlns="http://www.w3.org/2000/svg"
                 preserveAspectRatio="none"
-                overflow="visible"
                 width="${this.width}" 
                 height="${this.height}" 
                 viewbox="0 0 ${this.duration} 1">
