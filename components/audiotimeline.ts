@@ -60,7 +60,7 @@ export class AudioTimeline extends HTMLElement {
 
             const maxValue = Math.max(...event.eventEnvelope);
 
-            const elementHeight = 0.1;
+            const elementHeight = 0.05;
 
             const barHeight = (x: number) => {
                 return (x / maxValue) * elementHeight;
@@ -76,7 +76,7 @@ export class AudioTimeline extends HTMLElement {
                         ${event.eventEnvelope
                             .map(
                                 (e, index) =>
-                                    `<rect rx="0.2" ry="0.2" x="${
+                                    `<rect rx="0.1" ry="0.1" x="${
                                         event.eventTime + index * step
                                     }" y="${
                                         event.y + startY(e)
@@ -91,10 +91,6 @@ export class AudioTimeline extends HTMLElement {
 
         shadow.innerHTML = `
             <style>
-                svg {
-                    border: solid 1px #000;
-                }
-
                 g {
                     cursor: pointer;
                 }
@@ -108,8 +104,6 @@ export class AudioTimeline extends HTMLElement {
                     ${events.map(eventComponent).join('')}
             </svg>
         `;
-
-        // const svgContainer = shadow.querySelector('svg');
 
         shadow.querySelectorAll('g').forEach((element, index) => {
             element.addEventListener('click', (evt: PointerEvent) => {

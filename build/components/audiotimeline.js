@@ -32,7 +32,7 @@ export class AudioTimeline extends HTMLElement {
         const eventComponent = (event) => {
             const step = event.eventDuration / event.eventEnvelope.length;
             const maxValue = Math.max(...event.eventEnvelope);
-            const elementHeight = 0.1;
+            const elementHeight = 0.05;
             const barHeight = (x) => {
                 return (x / maxValue) * elementHeight;
             };
@@ -43,17 +43,13 @@ export class AudioTimeline extends HTMLElement {
             return `
                     <g>
                         ${event.eventEnvelope
-                .map((e, index) => `<rect rx="0.2" ry="0.2" x="${event.eventTime + index * step}" y="${event.y + startY(e)}" width="${step}" height="${barHeight(e)}" fill="${event.color}" />`)
+                .map((e, index) => `<rect rx="0.1" ry="0.1" x="${event.eventTime + index * step}" y="${event.y + startY(e)}" width="${step}" height="${barHeight(e)}" fill="${event.color}" />`)
                 .join('')}
                     </g>
             `;
         };
         shadow.innerHTML = `
             <style>
-                svg {
-                    border: solid 1px #000;
-                }
-
                 g {
                     cursor: pointer;
                 }
@@ -61,14 +57,12 @@ export class AudioTimeline extends HTMLElement {
             <svg 
                 xmlns="http://www.w3.org/2000/svg"
                 preserveAspectRatio="none"
-                overflow="visible"
                 width="${this.width}" 
                 height="${this.height}" 
                 viewbox="0 0 ${this.duration} 1">
                     ${events.map(eventComponent).join('')}
             </svg>
         `;
-        // const svgContainer = shadow.querySelector('svg');
         shadow.querySelectorAll('g').forEach((element, index) => {
             element.addEventListener('click', (evt) => {
                 const event = events[index];
