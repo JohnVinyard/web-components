@@ -94,12 +94,9 @@ export class AudioTimeline extends HTMLElement {
                 g {
                     cursor: pointer;
                 }
-                g rect {
-                    transition: all 0.25s;
-                }
                 g:hover rect {
-                    stroke: rgba(0, 0, 0, 0.1);
-                    stroke-width: 0.01;
+                    stroke: rgba(0, 0, 0, 0.2);
+                    stroke-width: 0.025;
                 }
             </style>
             <svg 
