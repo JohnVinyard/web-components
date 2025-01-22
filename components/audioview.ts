@@ -256,7 +256,8 @@ export class AudioView extends HTMLElement {
                     float: left;
                     margin: 3px;
                     padding: 3px;
-                    font-size: 0.75em;
+                    font-size: 1em;
+                    font-weight: bold;
                     background-color: #eee;
                 }
                 

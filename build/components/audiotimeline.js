@@ -57,15 +57,23 @@ export class AudioTimeline extends HTMLElement {
                     stroke: rgba(0, 0, 0, 0.2);
                     stroke-width: 0.025;
                 }
+                @media (max-width: 992px) {
+                    .audio-timeline {
+                        max-width: 100%;
+                        overflow-x: scroll;
+                    }
+                }
             </style>
-            <svg 
-                xmlns="http://www.w3.org/2000/svg"
-                preserveAspectRatio="none"
-                width="${this.width}" 
-                height="${this.height}" 
-                viewbox="0 0 ${this.duration} 1">
-                    ${events.map(eventComponent).join('')}
-            </svg>
+            <div class="audio-timeline">
+                <svg 
+                    xmlns="http://www.w3.org/2000/svg"
+                    preserveAspectRatio="none"
+                    width="${this.width}" 
+                    height="${this.height}" 
+                    viewbox="0 0 ${this.duration} 1">
+                        ${events.map(eventComponent).join('')}
+                </svg>
+            </div>
         `;
         shadow.querySelectorAll('g').forEach((element, index) => {
             element.addEventListener('click', (evt) => {
