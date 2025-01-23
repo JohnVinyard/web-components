@@ -79,7 +79,6 @@ export class Instrument extends HTMLElement {
 </div>
 `;
         const start = shadow.getElementById('start-demo');
-        console.log('START BUTTON', start);
         const context = new AudioContext();
         const fetchBinary = (url) => __awaiter(this, void 0, void 0, function* () {
             const resp = yield fetch(url);
@@ -109,7 +108,6 @@ export class Instrument extends HTMLElement {
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
-                    console.log('INITIALIZING CONV UNIT');
                     this.initialized = true;
                     try {
                         yield context.audioWorklet.addModule('/build/components/whitenoise.js');
@@ -156,7 +154,6 @@ export class Instrument extends HTMLElement {
                 });
             }
         }
-        console.log('CONV UNIT', ConvUnit);
         class Controller {
             constructor(urls) {
                 this.units = urls.reduce((accum, url) => {
@@ -178,7 +175,6 @@ export class Instrument extends HTMLElement {
                 });
             }
         }
-        console.log('Controller', Controller);
         const activeNotes = new Set(['C']);
         console.log('ACTIVE NOTES', activeNotes);
         const notes = {
@@ -187,14 +183,10 @@ export class Instrument extends HTMLElement {
             G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
             B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
         };
-        console.log('NOTES', notes);
         const unit = new Controller(Object.values(notes));
-        console.log('UNIT', unit);
         const buttons = shadow.querySelectorAll('.big-button');
-        console.log('INITIAL BUTTONS', buttons);
         buttons.forEach((button) => {
             button.addEventListener('click', (event) => {
-                console.log('CLICKED', event);
                 const id = event.target.id;
                 if (!id || id === '') {
                     return;
