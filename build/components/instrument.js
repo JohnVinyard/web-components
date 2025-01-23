@@ -79,6 +79,7 @@ export class Instrument extends HTMLElement {
 </div>
 `;
         const start = shadow.getElementById('start-demo');
+        console.log('START BUTTON', start);
         const context = new AudioContext();
         const fetchBinary = (url) => __awaiter(this, void 0, void 0, function* () {
             const resp = yield fetch(url);
@@ -108,26 +109,22 @@ export class Instrument extends HTMLElement {
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
+                    console.log('INITIALIZING CONV UNIT');
                     this.initialized = true;
-                    yield context.audioWorklet.addModule('instrument.js');
+                    try {
+                        yield context.audioWorklet.addModule('/build/components/whitenoise.js');
+                    }
+                    catch (err) {
+                        console.log(`Failed to add module due to ${err}`);
+                    }
                     const osc = context.createOscillator();
-                    // const scriptNode = context.createScriptProcessor(512, 1, 1);
-                    const whiteNoise = new AudioWorkletNode(context, 'white-noise');
+                    const whiteNoise = new AudioWorkletNode(context, 'white-noise', {});
                     const gainNode = context.createGain();
                     const conv = context.createConvolver();
                     const filter = context.createBiquadFilter();
                     filter.type = 'lowpass';
                     filter.frequency.setValueAtTime(500, context.currentTime);
                     conv.buffer = yield fetchAudio(this.url, context);
-                    // scriptNode.addEventListener(
-                    //     'audioprocess',
-                    //     ({ inputBuffer, outputBuffer }) => {
-                    //         const output = outputBuffer.getChannelData(0);
-                    //         for (let i = 0; i < output.length; i++) {
-                    //             output[i] = Math.random() * 2 - 1;
-                    //         }
-                    //     }
-                    // );
                     osc.connect(whiteNoise);
                     whiteNoise.connect(gainNode);
                     gainNode.connect(conv);
@@ -136,9 +133,13 @@ export class Instrument extends HTMLElement {
                     osc.start();
                     this.gain = gainNode;
                     this.filt = filter;
+                    console.log('DONE initializing', this.gain, this.filt);
                 });
             }
             updateCutoff(hz) {
+                if (!this.filt) {
+                    return;
+                }
                 this.filt.frequency.exponentialRampToValueAtTime(hz, context.currentTime + 0.05);
             }
             trigger(amplitude) {
@@ -147,11 +148,15 @@ export class Instrument extends HTMLElement {
                         console.log('Initializing');
                         yield this.initialize();
                     }
+                    if (!this.gain) {
+                        return;
+                    }
                     this.gain.gain.exponentialRampToValueAtTime(amplitude, context.currentTime + 0.001);
                     this.gain.gain.exponentialRampToValueAtTime(0.000001, context.currentTime + 0.2);
                 });
             }
         }
+        console.log('CONV UNIT', ConvUnit);
         class Controller {
             constructor(urls) {
                 this.units = urls.reduce((accum, url) => {
@@ -173,18 +178,27 @@ export class Instrument extends HTMLElement {
                 });
             }
         }
+        console.log('Controller', Controller);
         const activeNotes = new Set(['C']);
+        console.log('ACTIVE NOTES', activeNotes);
         const notes = {
             C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
             E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
             G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
             B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
         };
+        console.log('NOTES', notes);
         const unit = new Controller(Object.values(notes));
-        const buttons = document.querySelectorAll('.big-button');
+        console.log('UNIT', unit);
+        const buttons = shadow.querySelectorAll('.big-button');
+        console.log('INITIAL BUTTONS', buttons);
         buttons.forEach((button) => {
             button.addEventListener('click', (event) => {
+                console.log('CLICKED', event);
                 const id = event.target.id;
+                if (!id || id === '') {
+                    return;
+                }
                 console.log(activeNotes);
                 if (activeNotes.has(id)) {
                     activeNotes.delete(id);
@@ -199,7 +213,6 @@ export class Instrument extends HTMLElement {
         const useMouse = () => {
             document.addEventListener('mousemove', ({ movementX, movementY, clientX, clientY }) => {
                 if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
-                    // unit.trigger(1);
                     unit.trigger(Array.from(activeNotes).map((an) => notes[an]), 1);
                 }
                 const u = vertical.translateTo(clientY, unitInterval);
@@ -209,9 +222,6 @@ export class Instrument extends HTMLElement {
         };
         const useAcc = () => {
             if (DeviceMotionEvent) {
-                // if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                //     DeviceMotionEvent.requestPermission();
-                // }
                 window.addEventListener('deviceorientationabsolute', (event) => {
                     const u = gamma.translateTo(event.gamma, unitInterval);
                     const hz = unitInterval.translateTo(Math.pow(u, 4), filterCutoff);

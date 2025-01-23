@@ -1,4 +1,9 @@
 class WhiteNoise extends AudioWorkletProcessor {
+    
+    constructor() {
+        super();
+    }
+
     process(
         inputs: Float32Array[][],
         outputs: Float32Array[][],

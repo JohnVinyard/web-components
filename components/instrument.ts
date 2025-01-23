@@ -124,11 +124,20 @@ export class Instrument extends HTMLElement {
             async initialize() {
                 this.initialized = true;
 
-                await context.audioWorklet.addModule('instrument.js');
+                try {
+                    await context.audioWorklet.addModule(
+                        '/build/components/whitenoise.js'
+                    );
+                } catch (err) {
+                    console.log(`Failed to add module due to ${err}`);
+                }
 
                 const osc = context.createOscillator();
-                // const scriptNode = context.createScriptProcessor(512, 1, 1);
-                const whiteNoise = new AudioWorkletNode(context, 'white-noise');
+                const whiteNoise = new AudioWorkletNode(
+                    context,
+                    'white-noise',
+                    {}
+                );
                 const gainNode = context.createGain();
                 const conv = context.createConvolver();
 
@@ -138,28 +147,24 @@ export class Instrument extends HTMLElement {
 
                 conv.buffer = await fetchAudio(this.url, context);
 
-                // scriptNode.addEventListener(
-                //     'audioprocess',
-                //     ({ inputBuffer, outputBuffer }) => {
-                //         const output = outputBuffer.getChannelData(0);
-
-                //         for (let i = 0; i < output.length; i++) {
-                //             output[i] = Math.random() * 2 - 1;
-                //         }
-                //     }
-                // );
-
                 osc.connect(whiteNoise);
                 whiteNoise.connect(gainNode);
                 gainNode.connect(conv);
                 conv.connect(filter);
                 filter.connect(context.destination);
                 osc.start();
+
                 this.gain = gainNode;
                 this.filt = filter;
+
+                console.log('DONE initializing', this.gain, this.filt);
             }
 
             updateCutoff(hz: number) {
+                if (!this.filt) {
+                    return;
+                }
+
                 this.filt.frequency.exponentialRampToValueAtTime(
                     hz,
                     context.currentTime + 0.05
@@ -170,6 +175,10 @@ export class Instrument extends HTMLElement {
                 if (!this.initialized) {
                     console.log('Initializing');
                     await this.initialize();
+                }
+
+                if (!this.gain) {
+                    return;
                 }
 
                 this.gain.gain.exponentialRampToValueAtTime(
@@ -208,6 +217,7 @@ export class Instrument extends HTMLElement {
         }
 
         const activeNotes = new Set(['C']);
+        console.log('ACTIVE NOTES', activeNotes);
 
         const notes = {
             C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
@@ -218,10 +228,15 @@ export class Instrument extends HTMLElement {
 
         const unit = new Controller(Object.values(notes));
 
-        const buttons = document.querySelectorAll('.big-button');
+        const buttons = shadow.querySelectorAll('.big-button');
         buttons.forEach((button) => {
             button.addEventListener('click', (event) => {
                 const id = event.target.id;
+
+                if (!id || id === '') {
+                    return;
+                }
+
                 console.log(activeNotes);
                 if (activeNotes.has(id)) {
                     activeNotes.delete(id);
@@ -238,7 +253,6 @@ export class Instrument extends HTMLElement {
                 'mousemove',
                 ({ movementX, movementY, clientX, clientY }) => {
                     if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
-                        // unit.trigger(1);
                         unit.trigger(
                             Array.from(activeNotes).map((an) => notes[an]),
                             1
@@ -254,10 +268,6 @@ export class Instrument extends HTMLElement {
 
         const useAcc = () => {
             if (DeviceMotionEvent) {
-                // if (typeof DeviceMotionEvent.requestPermission === 'function') {
-                //     DeviceMotionEvent.requestPermission();
-                // }
-
                 window.addEventListener(
                     'deviceorientationabsolute',
                     (event) => {
