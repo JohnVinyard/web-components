@@ -4,5 +4,6 @@ import { TensorView } from './tensor';
 import { CodeBlock } from './codeblock';
 import { CitationBlock } from './citation';
 import { AudioTimeline } from './audiotimeline';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, };
+import { Instrument } from './instrument';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, };
 //# sourceMappingURL=index.js.map

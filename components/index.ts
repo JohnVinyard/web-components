@@ -4,6 +4,7 @@ import { TensorView } from './tensor';
 import { CodeBlock } from './codeblock';
 import { CitationBlock } from './citation';
 import { AudioTimeline } from './audiotimeline';
+import { Instrument } from './instrument';
 
 export {
     AudioView,
@@ -12,4 +13,5 @@ export {
     CodeBlock,
     CitationBlock,
     AudioTimeline,
+    Instrument,
 };

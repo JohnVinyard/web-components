@@ -52,6 +52,11 @@
   resolved "https://registry.yarnpkg.com/@tweenjs/tween.js/-/tween.js-23.1.2.tgz#4e5357fd6742f5aa50447d3fa808aed4cda93ed7"
   integrity sha512-kMCNaZCJugWI86xiEHaY338CU5JpD0B97p1j1IKNn/Zto8PgACjQx0UxbHjmOcLl/dDOBnItwD07KmCs75pxtQ==
 
+"@types/audioworklet@0.0.66":
+  version "0.0.66"
+  resolved "https://registry.yarnpkg.com/@types/audioworklet/-/audioworklet-0.0.66.tgz#caf7fb220e29aa6658cef8adc28ad5751e359db9"
+  integrity sha512-cFrUH53LgUzzOdBNEFz5xdXUBt4YLT6tXBPZjczqGItwyyVMF2kNPudjddhIQQOTvILzEYdwJpFsAfmZp7rt7Q==
+
 "@types/eslint-scope@^3.7.3":
   version "3.7.7"
   resolved "https://registry.yarnpkg.com/@types/eslint-scope/-/eslint-scope-3.7.7.tgz#3108bd5f18b0cdb277c867b3dd449c9ed7079ac5"

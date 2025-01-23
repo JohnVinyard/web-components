@@ -11,7 +11,8 @@
         "declaration": false,
         "sourceMap": true,
         "rootDir": "./",
-        "outDir": "./build"
+        "outDir": "./build",
+        "skipLibCheck": true
     },
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "components/*.ts"],
     "exclude": ["node_modules"]
