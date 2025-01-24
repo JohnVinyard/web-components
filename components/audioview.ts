@@ -130,6 +130,7 @@ export class AudioView extends HTMLElement {
     public samples: string | null;
     public scale: string | null;
     public controls: string | null;
+    public color: string | null;
 
     private isPlaying: boolean = false;
     private playingBuffer: AudioBufferSourceNode | null;
@@ -148,6 +149,7 @@ export class AudioView extends HTMLElement {
         this.timeoutHandle = null;
         this.currentEndTimeSeconds = null;
         this.controls = null;
+        this.color = '#33aa55';
     }
 
     private get showControls(): boolean {
@@ -165,12 +167,6 @@ export class AudioView extends HTMLElement {
         const currentPixelPosition = container.scrollLeft;
         const currentVisiblePixels = this.parentElement.clientWidth;
         const endPixelPosition = currentPixelPosition + currentVisiblePixels;
-
-        const startTimeSeconds = intervalMapping.map(
-            currentPixelPosition,
-            'pixels',
-            'seconds'
-        );
 
         if (this.buffer !== null) {
             const totalDuration = this.buffer.duration;
@@ -239,9 +235,13 @@ export class AudioView extends HTMLElement {
                     overflow-y: hidden;
                     position: relative;
                     border: solid 1px #eee;
-
                     background: rgb(34,193,195);
                     background: linear-gradient(0deg, rgba(200,200,200,0.5) 0%, rgba(255,255,255,0.5) 100%);
+                }
+
+                .audio-view-container.playing {
+                    background: rgb(34,193,195);
+                    background: linear-gradient(0deg, rgba(80,80,80,0.5) 0%, rgba(255,255,255,0.5) 40%);
                 }
 
                 .audio-view-controls-container {
@@ -335,6 +335,10 @@ export class AudioView extends HTMLElement {
 
             this.isPlaying = !this.isPlaying;
             control.innerHTML = this.isPlaying ? 'stop' : 'play';
+            const container = this.shadowRoot.querySelector(
+                '.audio-view-container'
+            );
+            container.classList.remove('playing');
             clearTimeout(this.timeoutHandle);
 
             if (this.isPlaying) {
@@ -344,18 +348,24 @@ export class AudioView extends HTMLElement {
                     'pixels',
                     'seconds'
                 );
+                const canvas = this.shadowRoot.querySelector('canvas');
+                canvas.style.filter = '';
                 this.playAudio(this.src, startTimeSeconds);
             } else if (this.playingBuffer !== null) {
                 this.playingBuffer.stop();
                 this.playingBuffer = null;
+                const canvas = this.shadowRoot.querySelector('canvas');
+                canvas.style.filter = 'blur(2px)';
             }
         });
 
         const audioData = this.buffer?.getChannelData(0) ?? new Float32Array(0);
 
         const drawContext = canvas.getContext('2d');
-        drawContext.strokeStyle = '#000000';
-        drawContext.fillStyle = '#000000';
+        drawContext.strokeStyle = this.color;
+        drawContext.fillStyle = this.color;
+
+        canvas.style.filter = 'blur(2px)';
 
         const midline = canvas.clientHeight / 2;
 
@@ -395,19 +405,37 @@ export class AudioView extends HTMLElement {
             duration
         );
         this.isPlaying = true;
-        this.shadowRoot.querySelector('.audio-view-control').innerHTML = 'stop';
+
+        const audioView = this.shadowRoot.querySelector('.audio-view-control');
+        audioView.innerHTML = 'stop';
+        const container = this.shadowRoot.querySelector(
+            '.audio-view-container'
+        );
+        container.classList.add('playing');
+
+        const canvas = this.shadowRoot.querySelector('canvas');
+        canvas.style.filter = '';
 
         // @ts-ignore
         this.timeoutHandle = setTimeout(() => {
             this.isPlaying = false;
             this.playingBuffer = null;
-            this.shadowRoot.querySelector('.audio-view-control').innerHTML =
-                'play';
+            const audioView = this.shadowRoot.querySelector(
+                '.audio-view-control'
+            );
+            audioView.innerHTML = 'play';
+
+            const container = this.shadowRoot.querySelector(
+                '.audio-view-container'
+            );
+            container.classList.remove('playing');
+            const canvas = this.shadowRoot.querySelector('canvas');
+            canvas.style.filter = 'blur(2px)';
         }, duration * 1000);
     }
 
     public static get observedAttributes(): (keyof AudioView)[] {
-        return ['src', 'scale', 'height', 'samples', 'controls'];
+        return ['src', 'scale', 'height', 'samples', 'controls', 'color'];
     }
 
     public attributeChangedCallback(
@@ -435,6 +463,11 @@ export class AudioView extends HTMLElement {
         }
 
         if (property === 'controls') {
+            this.render();
+            return;
+        }
+
+        if (property === 'color') {
             this.render();
             return;
         }
