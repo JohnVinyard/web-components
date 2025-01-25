@@ -114,11 +114,6 @@ export class AudioView extends HTMLElement {
         const currentPixelPosition = container.scrollLeft;
         const currentVisiblePixels = this.parentElement.clientWidth;
         const endPixelPosition = currentPixelPosition + currentVisiblePixels;
-        // const startTimeSeconds = intervalMapping.map(
-        //     currentPixelPosition,
-        //     'pixels',
-        //     'seconds'
-        // );
         if (this.buffer !== null) {
             const totalDuration = this.buffer.duration;
             this.currentEndTimeSeconds = Math.min(intervalMapping.map(endPixelPosition, 'pixels', 'seconds'), totalDuration);
