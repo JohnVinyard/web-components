@@ -12,7 +12,8 @@
         "sourceMap": true,
         "rootDir": "./",
         "outDir": "./build",
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "resolveJsonModule": true
     },
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "components/*.ts"],
     "exclude": ["node_modules"]

@@ -1,5 +1,4 @@
 class WhiteNoise extends AudioWorkletProcessor {
-    
     constructor() {
         super();
     }

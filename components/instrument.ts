@@ -1,3 +1,52 @@
+import { fromNpy } from './numpy';
+import {
+    in_projection,
+    out_projection,
+    rnn_in_projection,
+    rnn_out_projection,
+} from './rnn_weights.json';
+
+export const tanh = (arr: Float32Array): Float32Array => {
+    return arr.map(Math.tanh);
+};
+
+export const tanh2d = (arr: Float32Array[]): Float32Array[] => {
+    return arr.map(tanh);
+};
+
+export const sin = (arr: Float32Array): Float32Array => {
+    return arr.map(Math.sin);
+};
+
+export const sin2d = (arr: Float32Array[]): Float32Array[] => {
+    return arr.map(sin);
+};
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+const [inProjection, inProjectionShape] = fromNpy(
+    base64ToArrayBuffer(in_projection)
+);
+
+const [outProjection, outProjectionShape] = fromNpy(
+    base64ToArrayBuffer(out_projection)
+);
+
+const [rnnInProjection, rnnInProjectionShape] = fromNpy(
+    base64ToArrayBuffer(rnn_in_projection)
+);
+
+const [rnnOutProjection, rnnOutProjectionShape] = fromNpy(
+    base64ToArrayBuffer(rnn_out_projection)
+);
+
 class Interval {
     public readonly range: number;
 
@@ -80,7 +129,9 @@ export class Instrument extends HTMLElement {
 
         const start = shadow.getElementById('start-demo');
 
-        const context = new AudioContext();
+        const context = new AudioContext({
+            sampleRate: 22050,
+        });
 
         const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
             const resp = await fetch(url);
@@ -116,9 +167,20 @@ export class Instrument extends HTMLElement {
             private initialized: boolean = false;
             private gain: GainNode | null = null;
             private filt: BiquadFilterNode | null = null;
+            private instrument: AudioWorkletNode | null = null;
 
             constructor(public readonly url: string) {
                 this.url = url;
+            }
+
+            public async triggerInstrument(arr: Float32Array) {
+                if (!this.initialized) {
+                    await this.initialize();
+                }
+
+                if (this.instrument.port) {
+                    this.instrument.port.postMessage(arr);
+                }
             }
 
             async initialize() {
@@ -126,36 +188,59 @@ export class Instrument extends HTMLElement {
 
                 try {
                     await context.audioWorklet.addModule(
-                        '/build/components/whitenoise.js'
+                        '/build/components/rnn.js'
                     );
                 } catch (err) {
+                    console.log('=======================================');
                     console.log(`Failed to add module due to ${err}`);
                 }
 
-                const osc = context.createOscillator();
+                // const osc = context.createOscillator();
                 const whiteNoise = new AudioWorkletNode(
                     context,
-                    'white-noise',
-                    {}
+                    'rnn-instrument',
+                    {
+                        processorOptions: {
+                            inProjection: {
+                                array: inProjection,
+                                shape: inProjectionShape,
+                            },
+                            outProjection: {
+                                array: outProjection,
+                                shape: outProjectionShape,
+                            },
+                            rnnInProjection: {
+                                array: rnnInProjection,
+                                shape: rnnInProjectionShape,
+                            },
+                            rnnOutProjection: {
+                                array: rnnOutProjection,
+                                shape: rnnOutProjectionShape,
+                            },
+                        },
+                    }
                 );
-                const gainNode = context.createGain();
-                const conv = context.createConvolver();
 
-                const filter = context.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.setValueAtTime(500, context.currentTime);
+                // const gainNode = context.createGain();
+                // const conv = context.createConvolver();
 
-                conv.buffer = await fetchAudio(this.url, context);
+                // const filter = context.createBiquadFilter();
+                // filter.type = 'lowpass';
+                // filter.frequency.setValueAtTime(500, context.currentTime);
 
-                osc.connect(whiteNoise);
-                whiteNoise.connect(gainNode);
-                gainNode.connect(conv);
-                conv.connect(filter);
-                filter.connect(context.destination);
-                osc.start();
+                // conv.buffer = await fetchAudio(this.url, context);
 
-                this.gain = gainNode;
-                this.filt = filter;
+                // osc.connect(whiteNoise);
+                // whiteNoise.connect(gainNode);
+                // gainNode.connect(conv);
+                // conv.connect(filter);
+                // filter.connect(context.destination);
+                // osc.start();
+                whiteNoise.connect(context.destination);
+
+                // this.gain = gainNode;
+                // this.filt = filter;
+                this.instrument = whiteNoise;
 
                 console.log('DONE initializing', this.gain, this.filt);
             }
@@ -192,6 +277,13 @@ export class Instrument extends HTMLElement {
             }
         }
 
+        const notes: Record<string, string> = {
+            C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
+            E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
+            G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
+            B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
+        };
+
         class Controller {
             private readonly units: Record<string, ConvUnit>;
 
@@ -200,6 +292,15 @@ export class Instrument extends HTMLElement {
                     accum[url] = new ConvUnit(url);
                     return accum;
                 }, {});
+            }
+
+            public triggerInstrument(arr: Float32Array) {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                console.log('INNER TRIGGER', key, convUnit);
+                if (convUnit) {
+                    convUnit.triggerInstrument(arr);
+                }
             }
 
             updateCutoff(hz: number) {
@@ -218,13 +319,6 @@ export class Instrument extends HTMLElement {
 
         const activeNotes = new Set(['C']);
         console.log('ACTIVE NOTES', activeNotes);
-
-        const notes = {
-            C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
-            E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
-            G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
-            B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
-        };
 
         const unit = new Controller(Object.values(notes));
 
@@ -249,21 +343,31 @@ export class Instrument extends HTMLElement {
         });
 
         const useMouse = () => {
-            document.addEventListener(
-                'mousemove',
-                ({ movementX, movementY, clientX, clientY }) => {
-                    if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
-                        unit.trigger(
-                            Array.from(activeNotes).map((an) => notes[an]),
-                            1
-                        );
-                    }
-
-                    const u = vertical.translateTo(clientY, unitInterval);
-                    const hz = unitInterval.translateTo(u ** 2, filterCutoff);
-                    unit.updateCutoff(hz);
+            document.addEventListener('click', (event: MouseEvent) => {
+                const arr = new Float32Array(64).map((x) =>
+                    Math.random() > 0.9 ? Math.random() * 2 : 0
+                );
+                console.log('OUTER TRIGGER', unit);
+                if (unit) {
+                    unit.triggerInstrument(arr);
                 }
-            );
+            });
+
+            // document.addEventListener(
+            //     'mousemove',
+            //     ({ movementX, movementY, clientX, clientY }) => {
+            //         if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
+            //             unit.trigger(
+            //                 Array.from(activeNotes).map((an) => notes[an]),
+            //                 1
+            //             );
+            //         }
+
+            //         const u = vertical.translateTo(clientY, unitInterval);
+            //         const hz = unitInterval.translateTo(u ** 2, filterCutoff);
+            //         unit.updateCutoff(hz);
+            //     }
+            // );
         };
 
         const useAcc = () => {
@@ -312,7 +416,7 @@ export class Instrument extends HTMLElement {
         };
 
         start.addEventListener('click', async (event) => {
-            useAcc();
+            // useAcc();
             useMouse();
 
             // TODO: How do I get to the button element here?

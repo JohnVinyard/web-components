@@ -6,13 +6,13 @@ import {
     AmbientLight,
     Object3D,
     Object3DEventMap,
-    TypedArray,
     Color,
     Mesh,
     MeshBasicMaterial,
     BoxGeometry,
 } from 'three';
 import { OrbitControls } from 'three-orbitcontrols-ts';
+import { AccessibleTypeArray, fromNpy } from './numpy';
 
 const COLOR_MAP: number[][] = [
     [0.050383, 0.029803, 0.527975],
@@ -283,12 +283,6 @@ type Point = [number, number, number];
 
 type WorldChild = Object3D<Object3DEventMap>;
 
-interface Accessible {
-    at(index: number): number;
-}
-
-type AccessibleTypeArray = TypedArray & Accessible;
-
 class World {
     private readonly camera: PerspectiveCamera;
     private readonly renderer: WebGLRenderer;
@@ -393,42 +387,6 @@ class World {
         throw new Error('Not Implemented');
     }
 }
-
-enum DataType {
-    Float32 = '<f4',
-    Float64 = '<f8',
-    Uint32 = '<u4',
-}
-
-const DataTypeOptions = new Set<string>([
-    DataType.Float32,
-    DataType.Float64,
-    DataType.Uint32,
-]);
-
-const dataTypeGuard = (value: string): value is DataType => {
-    if (!DataTypeOptions.has(value)) {
-        return false;
-    }
-
-    return true;
-};
-
-const dtypeToConstructor = (dtype: DataType) => {
-    if (dtype === '<f4') {
-        return Float32Array;
-    }
-
-    if (dtype === '<f8') {
-        return Float64Array;
-    }
-
-    if (dtype === '<u4') {
-        return Uint32Array;
-    }
-
-    throw new Error(`Type ${dtype} not implemented`);
-};
 
 const product = (arr: number[]): number => {
     if (arr.length === 0) {
@@ -583,28 +541,7 @@ class TensorData {
     }
 
     static async fromNpy(raw: ArrayBuffer) {
-        const headerAndData = raw.slice(8);
-        const headerLen = (
-            new Uint16Array(headerAndData.slice(0, 2)) as AccessibleTypeArray
-        ).at(0);
-
-        const arr = new Uint8Array(headerAndData.slice(2, 2 + headerLen));
-        const str = String.fromCharCode(...arr);
-        const dtypePattern = /('descr':\s+)'([^']+)'/;
-        const shapePattern = /('shape':\s+)(\([^/)]+\))/;
-
-        const dtype = str.match(dtypePattern)[2];
-        if (!dataTypeGuard(dtype)) {
-            throw new Error(`Only ${DataTypeOptions} are currently supported`);
-        }
-        const rawShape = str.match(shapePattern)[2];
-        const hasTrailingComma = rawShape.slice(-2)[0] === ',';
-        const truncated = rawShape.slice(1, hasTrailingComma ? -2 : -1);
-        const massagedShape = `[${truncated}]`;
-        const shape = JSON.parse(massagedShape);
-        const arrayData = new (dtypeToConstructor(dtype))(
-            headerAndData.slice(2 + headerLen)
-        ) as AccessibleTypeArray;
+        const [arrayData, shape] = fromNpy(raw);
         return new TensorData(arrayData, shape);
     }
 
