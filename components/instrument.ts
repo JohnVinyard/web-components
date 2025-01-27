@@ -213,8 +213,8 @@ export class Instrument extends HTMLElement {
                     return scaled;
                 });
 
-            const vectorElementHeight: number = 20;
-            const vectorElementWidth: number = 20;
+            const vectorElementHeight: number = 10;
+            const vectorElementWidth: number = 10;
 
             const valueToRgb = (x: number): string => {
                 const eightBit = x * 255;
