@@ -150,6 +150,7 @@ export class Instrument extends HTMLElement {
             audioCache[url] = audioBufferPromise;
             return audioBufferPromise;
         });
+        const rnnWeightsUrl = this.url;
         class ConvUnit {
             constructor(url) {
                 this.url = url;
@@ -179,8 +180,7 @@ export class Instrument extends HTMLElement {
                         console.log('=======================================');
                         console.log(`Failed to add module due to ${err}`);
                     }
-                    console.log('FETCHING FROM', this.url);
-                    const weights = yield fetchRnnWeights(this.url);
+                    const weights = yield fetchRnnWeights(rnnWeightsUrl);
                     console.log('GOT WEIGHTS', weights);
                     const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                         processorOptions: weights,

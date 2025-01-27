@@ -19,6 +19,15 @@ interface RnnParams {
     rnnOutProjection: ArrayContainer;
 }
 
+interface Point {
+    x: number;
+    y: number;
+}
+
+export const pointToArray = (point: Point): Float32Array => {
+    return new Float32Array([point.x, point.y]);
+};
+
 export const tanh = (arr: Float32Array): Float32Array => {
     return arr.map(Math.tanh);
 };
@@ -139,77 +148,75 @@ export class Instrument extends HTMLElement {
         div {
             margin: 10px;
         }
-
-      .big-button {
-        width: 95vw;
-        height: 20vh;
-        margin: 0.1em;
-        padding: 0.1em;
-        font-size: 2em;
-        font-weight: bold;
-        text-align: center;
-        cursor: pointer;
-     }
-
-      .note-name {
-        vertical-align: middle;
-      }
-
-      .selected {
-        background-color: #eee;
-      }
+        .instrument-container {
+            height: 200px;
+            cursor: crosshair;
+            border: solid 1px #eee;
+        }
 </style>
-<div>
+<div class="instrument-container">
         <div>
-      <button id="start-demo">Start Demo</button>
-    </div>
-
-    <div class="big-button selected" id="C">
-      <span class="note-name">C</span>
-    </div>
-    <div class="big-button" id="E"><span class="note-name">E</span></div>
-    <div class="big-button" id="G"><span class="note-name">G</span></div>
-    <div class="big-button" id="B"><span class="note-name">B</span></div>
+            <button id="start-demo">Start Demo</button>
+        </div>
 </div>
 `;
 
         const start = shadow.getElementById('start-demo');
 
+        const container = shadow.getElementById('instrument-container');
+
         const context = new AudioContext({
             sampleRate: 22050,
         });
 
-        const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
-            const resp = await fetch(url);
-            return resp.arrayBuffer();
-        };
+        // const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
+        //     const resp = await fetch(url);
+        //     return resp.arrayBuffer();
+        // };
 
-        const audioCache: Record<string, Promise<AudioBuffer>> = {};
+        // const audioCache: Record<string, Promise<AudioBuffer>> = {};
 
-        const fetchAudio = async (url: string, context: AudioContext) => {
-            const cached = audioCache[url];
-            if (cached !== undefined) {
-                return cached;
-            }
+        // const fetchAudio = async (url: string, context: AudioContext) => {
+        //     const cached = audioCache[url];
+        //     if (cached !== undefined) {
+        //         return cached;
+        //     }
 
-            const audioBufferPromise = fetchBinary(url).then(function (
-                data: ArrayBuffer
-            ) {
-                return new Promise<AudioBuffer>(function (resolve, reject) {
-                    context.decodeAudioData(
-                        data,
-                        (buffer) => resolve(buffer),
-                        (error) => reject(error)
-                    );
-                });
-            });
+        //     const audioBufferPromise = fetchBinary(url).then(function (
+        //         data: ArrayBuffer
+        //     ) {
+        //         return new Promise<AudioBuffer>(function (resolve, reject) {
+        //             context.decodeAudioData(
+        //                 data,
+        //                 (buffer) => resolve(buffer),
+        //                 (error) => reject(error)
+        //             );
+        //         });
+        //     });
 
-            audioCache[url] = audioBufferPromise;
+        //     audioCache[url] = audioBufferPromise;
 
-            return audioBufferPromise;
-        };
+        //     return audioBufferPromise;
+        // };
 
         const rnnWeightsUrl = this.url;
+
+        // TODO: Here, we'd like to create a random projection from 2D click location
+        // to control-plane space
+        const clickProjectionFlat = new Float32Array(2 * 64).map(
+            (x) => Math.random() * 2 - 1
+        );
+
+        const currentControlPlaneVector: Float32Array = new Float32Array(
+            64
+        ).fill(0);
+
+        const currentControlPlaneMin = Math.min(...currentControlPlaneVector);
+        const currentControlPlaneMax = Math.max(...currentControlPlaneVector);
+        const currentControlPlaneSpan =
+            currentControlPlaneMax - currentControlPlaneMin;
+
+        const clickProjection = twoDimArray(clickProjectionFlat, [64, 2]);
 
         class ConvUnit {
             private initialized: boolean = false;
@@ -221,7 +228,7 @@ export class Instrument extends HTMLElement {
                 this.url = url;
             }
 
-            public async triggerInstrument(arr: Float32Array) {
+            public async triggerInstrument(arr: Float32Array, point: Point) {
                 if (!this.initialized) {
                     await this.initialize();
                 }
@@ -239,12 +246,10 @@ export class Instrument extends HTMLElement {
                         '/build/components/rnn.js'
                     );
                 } catch (err) {
-                    console.log('=======================================');
                     console.log(`Failed to add module due to ${err}`);
                 }
 
                 const weights = await fetchRnnWeights(rnnWeightsUrl);
-                console.log('GOT WEIGHTS', weights);
 
                 const whiteNoise = new AudioWorkletNode(
                     context,
@@ -257,8 +262,6 @@ export class Instrument extends HTMLElement {
                 whiteNoise.connect(context.destination);
 
                 this.instrument = whiteNoise;
-
-                console.log('DONE initializing', this.gain, this.filt);
             }
 
             updateCutoff(hz: number) {
@@ -274,7 +277,6 @@ export class Instrument extends HTMLElement {
 
             async trigger(amplitude: number) {
                 if (!this.initialized) {
-                    console.log('Initializing');
                     await this.initialize();
                 }
 
@@ -310,12 +312,12 @@ export class Instrument extends HTMLElement {
                 }, {});
             }
 
-            public triggerInstrument(arr: Float32Array) {
+            public triggerInstrument(arr: Float32Array, point: Point) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
                 console.log('INNER TRIGGER', key, convUnit);
                 if (convUnit) {
-                    convUnit.triggerInstrument(arr);
+                    convUnit.triggerInstrument(arr, point);
                 }
             }
 
@@ -334,38 +336,54 @@ export class Instrument extends HTMLElement {
         }
 
         const activeNotes = new Set(['C']);
-        console.log('ACTIVE NOTES', activeNotes);
 
         const unit = new Controller(Object.values(notes));
 
-        const buttons = shadow.querySelectorAll('.big-button');
-        buttons.forEach((button) => {
-            button.addEventListener('click', (event) => {
-                const id = event.target.id;
+        // const buttons = shadow.querySelectorAll('.big-button');
+        // buttons.forEach((button) => {
+        //     button.addEventListener('click', (event) => {
+        //         const id = event.target.id;
 
-                if (!id || id === '') {
-                    return;
-                }
+        //         if (!id || id === '') {
+        //             return;
+        //         }
 
-                console.log(activeNotes);
-                if (activeNotes.has(id)) {
-                    activeNotes.delete(id);
-                    button.classList.remove('selected');
-                } else {
-                    activeNotes.add(id);
-                    button.classList.add('selected');
-                }
-            });
-        });
+        //         console.log(activeNotes);
+        //         if (activeNotes.has(id)) {
+        //             activeNotes.delete(id);
+        //             button.classList.remove('selected');
+        //         } else {
+        //             activeNotes.add(id);
+        //             button.classList.add('selected');
+        //         }
+        //     });
+        // });
 
         const useMouse = () => {
-            document.addEventListener('click', (event: MouseEvent) => {
-                const arr = new Float32Array(64).map((x) =>
-                    Math.random() > 0.9 ? Math.random() * 2 : 0
-                );
-                console.log('OUTER TRIGGER', unit);
+            container.addEventListener('click', (event: MouseEvent) => {
+                // const arr = new Float32Array(64).map((x) =>
+                //     Math.random() > 0.9 ? Math.random() * 2 : 0
+                // );
+
                 if (unit) {
-                    unit.triggerInstrument(arr);
+                    const width = container.clientWidth;
+                    const height = container.clientHeight;
+
+                    // Get click coordinates in [0, 1]
+                    const x: number = event.offsetX / width;
+                    const y: number = event.offsetY / height;
+
+                    // Project click location to control plane space
+                    const point: Point = { x, y };
+                    const pointArr = pointToArray(point);
+                    const proj = dotProduct(pointArr, clickProjection);
+
+                    console.log(proj);
+                    currentControlPlaneVector.set(proj);
+
+                    // TODO: I don't actually need to pass the point here, since
+                    // the projection is the only thing that matters
+                    unit.triggerInstrument(proj, { x, y });
                 }
             });
 
