@@ -92,6 +92,20 @@ const relu = (vector: Float32Array): Float32Array => {
     return vector.map((x) => Math.max(0, x));
 };
 
+const oneHot = (vector: Float32Array): Float32Array => {
+    const output = new Float32Array(vector.length).fill(0);
+
+    const [mx, index] = vector.reduce(
+        ([mx, idx]: [number, number], current, index) => {
+            return current > mx ? [current, index] : [mx, idx];
+        },
+        [0, 0]
+    );
+
+    output[index] = vector[index];
+    return output;
+};
+
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     var binaryString = atob(base64);
     var bytes = new Uint8Array(binaryString.length);
@@ -417,15 +431,19 @@ export class Instrument extends HTMLElement {
                     const width = container.clientWidth;
                     const height = container.clientHeight;
 
-                    // Get click coordinates in [0, 1]
+                    // // Get click coordinates in [0, 1]
                     const x: number = event.offsetX / width;
                     const y: number = event.offsetY / height;
 
-                    // Project click location to control plane space, followed by RELU
+                    // // Project click location to control plane space, followed by RELU
                     const point: Point = { x, y };
                     const pointArr = pointToArray(point);
                     const proj = dotProduct(pointArr, clickProjection);
                     const pos = relu(proj);
+
+                    // const pos = new Float32Array(64).map((x) =>
+                    //     Math.random() > 0.9 ? Math.random() * 2 : 0
+                    // );
 
                     currentControlPlaneVector.set(pos);
 
@@ -435,7 +453,7 @@ export class Instrument extends HTMLElement {
 
                     // TODO: I don't actually need to pass the point here, since
                     // the projection is the only thing that matters
-                    unit.triggerInstrument(proj, { x, y });
+                    unit.triggerInstrument(pos, { x, y });
                 }
             });
 
