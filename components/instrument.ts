@@ -44,6 +44,54 @@ export const sin2d = (arr: Float32Array[]): Float32Array[] => {
     return arr.map(sin);
 };
 
+const twoDimArray = (
+    data: Float32Array,
+    shape: [number, number]
+): Float32Array[] => {
+    const [x, y] = shape;
+
+    const output: Float32Array[] = [];
+    for (let i = 0; i < data.length; i += y) {
+        output.push(data.slice(i, i + y));
+    }
+    return output;
+};
+
+const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
+    return a.reduce((accum, current, index) => {
+        return accum + current * b[index];
+    }, 0);
+};
+
+// const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
+//     return a.map((value, index) => value + b[index]);
+// };
+
+// const sum = (a: Float32Array): number => {
+//     return a.reduce((accum, current) => {
+//         return accum + current;
+//     }, 0);
+// };
+
+// const l1Norm = (a: Float32Array): number => {
+//     return sum(a.map(Math.abs));
+// };
+
+/**
+ * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
+ * with a new vector of length 128
+ */
+const dotProduct = (
+    vector: Float32Array,
+    matrix: Float32Array[]
+): Float32Array => {
+    return new Float32Array(matrix.map((v) => vectorVectorDot(v, vector)));
+};
+
+const relu = (vector: Float32Array): Float32Array => {
+    return vector.map((x) => Math.max(0, x));
+};
+
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     var binaryString = atob(base64);
     var bytes = new Uint8Array(binaryString.length);
@@ -125,7 +173,6 @@ class Interval {
 
 const filterCutoff = new Interval(500, 22050);
 const gamma = new Interval(-90, 90);
-const vertical = new Interval(0, window.innerHeight);
 const unitInterval = new Interval(0, 1);
 
 export class Instrument extends HTMLElement {
@@ -143,6 +190,55 @@ export class Instrument extends HTMLElement {
             shadow = this.attachShadow({ mode: 'open' });
         }
 
+        const currentControlPlaneVector: Float32Array = new Float32Array(
+            64
+        ).fill(Math.random() * 1e-3);
+
+        const renderVector = (
+            currentControlPlaneVector: Float32Array
+        ): string => {
+            const currentControlPlaneMin = Math.min(
+                ...currentControlPlaneVector
+            );
+            const currentControlPlaneMax = Math.max(
+                ...currentControlPlaneVector
+            );
+            const currentControlPlaneSpan =
+                currentControlPlaneMax - currentControlPlaneMin;
+
+            const normalizedControlPlaneVector: Float32Array =
+                currentControlPlaneVector.map((x) => {
+                    const shifted = x - currentControlPlaneMin;
+                    const scaled = shifted / (currentControlPlaneSpan + 1e-8);
+                    return scaled;
+                });
+
+            const vectorElementHeight: number = 20;
+            const vectorElementWidth: number = 20;
+
+            const valueToRgb = (x: number): string => {
+                const eightBit = x * 255;
+                return `rgba(${eightBit}, ${eightBit}, ${eightBit}, 1.0)`;
+            };
+
+            return `<svg width="${
+                vectorElementWidth * 64
+            }" height="${vectorElementHeight}">
+                ${Array.from(normalizedControlPlaneVector)
+                    .map(
+                        (x, index) =>
+                            `<rect 
+                                x="${index * vectorElementWidth}" 
+                                y="${0}" 
+                                width="${vectorElementWidth}" 
+                                height="${vectorElementHeight}"
+                                fill="${valueToRgb(x)}"
+                            />`
+                    )
+                    .join('')}
+            </svg>`;
+        };
+
         shadow.innerHTML = `
 <style>
         div {
@@ -152,69 +248,42 @@ export class Instrument extends HTMLElement {
             height: 200px;
             cursor: crosshair;
             border: solid 1px #eee;
+            position: relative;
+        }
+        .current-event-vector {
+            position: absolute;
+            top: 10px;
+            left: 150px;
         }
 </style>
 <div class="instrument-container">
         <div>
             <button id="start-demo">Start Demo</button>
         </div>
+        <div class="current-event-vector">
+            ${renderVector(currentControlPlaneVector)}
+        </div>
 </div>
 `;
 
         const start = shadow.getElementById('start-demo');
-
-        const container = shadow.getElementById('instrument-container');
+        const container = shadow.querySelector('.instrument-container');
+        const eventVectorContainer = shadow.querySelector(
+            '.current-event-vector'
+        );
 
         const context = new AudioContext({
             sampleRate: 22050,
         });
 
-        // const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
-        //     const resp = await fetch(url);
-        //     return resp.arrayBuffer();
-        // };
-
-        // const audioCache: Record<string, Promise<AudioBuffer>> = {};
-
-        // const fetchAudio = async (url: string, context: AudioContext) => {
-        //     const cached = audioCache[url];
-        //     if (cached !== undefined) {
-        //         return cached;
-        //     }
-
-        //     const audioBufferPromise = fetchBinary(url).then(function (
-        //         data: ArrayBuffer
-        //     ) {
-        //         return new Promise<AudioBuffer>(function (resolve, reject) {
-        //             context.decodeAudioData(
-        //                 data,
-        //                 (buffer) => resolve(buffer),
-        //                 (error) => reject(error)
-        //             );
-        //         });
-        //     });
-
-        //     audioCache[url] = audioBufferPromise;
-
-        //     return audioBufferPromise;
-        // };
-
         const rnnWeightsUrl = this.url;
 
         // TODO: Here, we'd like to create a random projection from 2D click location
         // to control-plane space
+        const scale = 10;
         const clickProjectionFlat = new Float32Array(2 * 64).map(
-            (x) => Math.random() * 2 - 1
+            (x) => Math.random() * scale - scale / 2
         );
-
-        const currentControlPlaneVector: Float32Array = new Float32Array(
-            64
-        ).fill(0);
-
-        const currentControlPlaneMin = Math.min(...currentControlPlaneVector);
-        const currentControlPlaneMax = Math.max(...currentControlPlaneVector);
-        const currentControlPlaneSpan =
-            currentControlPlaneMax - currentControlPlaneMin;
 
         const clickProjection = twoDimArray(clickProjectionFlat, [64, 2]);
 
@@ -233,7 +302,7 @@ export class Instrument extends HTMLElement {
                     await this.initialize();
                 }
 
-                if (this.instrument.port) {
+                if (this.instrument?.port) {
                     this.instrument.port.postMessage(arr);
                 }
             }
@@ -249,19 +318,23 @@ export class Instrument extends HTMLElement {
                     console.log(`Failed to add module due to ${err}`);
                 }
 
-                const weights = await fetchRnnWeights(rnnWeightsUrl);
+                try {
+                    const weights = await fetchRnnWeights(rnnWeightsUrl);
 
-                const whiteNoise = new AudioWorkletNode(
-                    context,
-                    'rnn-instrument',
-                    {
-                        processorOptions: weights,
-                    }
-                );
+                    const whiteNoise = new AudioWorkletNode(
+                        context,
+                        'rnn-instrument',
+                        {
+                            processorOptions: weights,
+                        }
+                    );
 
-                whiteNoise.connect(context.destination);
+                    whiteNoise.connect(context.destination);
 
-                this.instrument = whiteNoise;
+                    this.instrument = whiteNoise;
+                } catch (err) {
+                    console.log('Failed to initialize instrument');
+                }
             }
 
             updateCutoff(hz: number) {
@@ -315,7 +388,6 @@ export class Instrument extends HTMLElement {
             public triggerInstrument(arr: Float32Array, point: Point) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
-                console.log('INNER TRIGGER', key, convUnit);
                 if (convUnit) {
                     convUnit.triggerInstrument(arr, point);
                 }
@@ -339,32 +411,8 @@ export class Instrument extends HTMLElement {
 
         const unit = new Controller(Object.values(notes));
 
-        // const buttons = shadow.querySelectorAll('.big-button');
-        // buttons.forEach((button) => {
-        //     button.addEventListener('click', (event) => {
-        //         const id = event.target.id;
-
-        //         if (!id || id === '') {
-        //             return;
-        //         }
-
-        //         console.log(activeNotes);
-        //         if (activeNotes.has(id)) {
-        //             activeNotes.delete(id);
-        //             button.classList.remove('selected');
-        //         } else {
-        //             activeNotes.add(id);
-        //             button.classList.add('selected');
-        //         }
-        //     });
-        // });
-
         const useMouse = () => {
             container.addEventListener('click', (event: MouseEvent) => {
-                // const arr = new Float32Array(64).map((x) =>
-                //     Math.random() > 0.9 ? Math.random() * 2 : 0
-                // );
-
                 if (unit) {
                     const width = container.clientWidth;
                     const height = container.clientHeight;
@@ -373,13 +421,17 @@ export class Instrument extends HTMLElement {
                     const x: number = event.offsetX / width;
                     const y: number = event.offsetY / height;
 
-                    // Project click location to control plane space
+                    // Project click location to control plane space, followed by RELU
                     const point: Point = { x, y };
                     const pointArr = pointToArray(point);
                     const proj = dotProduct(pointArr, clickProjection);
+                    const pos = relu(proj);
 
-                    console.log(proj);
-                    currentControlPlaneVector.set(proj);
+                    currentControlPlaneVector.set(pos);
+
+                    eventVectorContainer.innerHTML = renderVector(
+                        currentControlPlaneVector
+                    );
 
                     // TODO: I don't actually need to pass the point here, since
                     // the projection is the only thing that matters
@@ -451,6 +503,8 @@ export class Instrument extends HTMLElement {
 
         start.addEventListener('click', async (event) => {
             // useAcc();
+            console.log('BEGINNING MONITORIING');
+
             useMouse();
 
             // TODO: How do I get to the button element here?

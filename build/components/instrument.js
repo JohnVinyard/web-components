@@ -8,6 +8,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { fromNpy } from './numpy';
+export const pointToArray = (point) => {
+    return new Float32Array([point.x, point.y]);
+};
 export const tanh = (arr) => {
     return arr.map(Math.tanh);
 };
@@ -19,6 +22,40 @@ export const sin = (arr) => {
 };
 export const sin2d = (arr) => {
     return arr.map(sin);
+};
+const twoDimArray = (data, shape) => {
+    const [x, y] = shape;
+    const output = [];
+    for (let i = 0; i < data.length; i += y) {
+        output.push(data.slice(i, i + y));
+    }
+    return output;
+};
+const vectorVectorDot = (a, b) => {
+    return a.reduce((accum, current, index) => {
+        return accum + current * b[index];
+    }, 0);
+};
+// const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
+//     return a.map((value, index) => value + b[index]);
+// };
+// const sum = (a: Float32Array): number => {
+//     return a.reduce((accum, current) => {
+//         return accum + current;
+//     }, 0);
+// };
+// const l1Norm = (a: Float32Array): number => {
+//     return sum(a.map(Math.abs));
+// };
+/**
+ * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
+ * with a new vector of length 128
+ */
+const dotProduct = (vector, matrix) => {
+    return new Float32Array(matrix.map((v) => vectorVectorDot(v, vector)));
+};
+const relu = (vector) => {
+    return vector.map((x) => Math.max(0, x));
 };
 const base64ToArrayBuffer = (base64) => {
     var binaryString = atob(base64);
@@ -77,7 +114,6 @@ class Interval {
 }
 const filterCutoff = new Interval(500, 22050);
 const gamma = new Interval(-90, 90);
-const vertical = new Interval(0, window.innerHeight);
 const unitInterval = new Interval(0, 1);
 export class Instrument extends HTMLElement {
     constructor() {
@@ -90,67 +126,72 @@ export class Instrument extends HTMLElement {
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
         }
+        const currentControlPlaneVector = new Float32Array(64).fill(Math.random() * 1e-3);
+        const renderVector = (currentControlPlaneVector) => {
+            const currentControlPlaneMin = Math.min(...currentControlPlaneVector);
+            const currentControlPlaneMax = Math.max(...currentControlPlaneVector);
+            const currentControlPlaneSpan = currentControlPlaneMax - currentControlPlaneMin;
+            const normalizedControlPlaneVector = currentControlPlaneVector.map((x) => {
+                const shifted = x - currentControlPlaneMin;
+                const scaled = shifted / (currentControlPlaneSpan + 1e-8);
+                return scaled;
+            });
+            const vectorElementHeight = 20;
+            const vectorElementWidth = 20;
+            const valueToRgb = (x) => {
+                const eightBit = x * 255;
+                return `rgba(${eightBit}, ${eightBit}, ${eightBit}, 1.0)`;
+            };
+            return `<svg width="${vectorElementWidth * 64}" height="${vectorElementHeight}">
+                ${Array.from(normalizedControlPlaneVector)
+                .map((x, index) => `<rect 
+                                x="${index * vectorElementWidth}" 
+                                y="${0}" 
+                                width="${vectorElementWidth}" 
+                                height="${vectorElementHeight}"
+                                fill="${valueToRgb(x)}"
+                            />`)
+                .join('')}
+            </svg>`;
+        };
         shadow.innerHTML = `
 <style>
         div {
             margin: 10px;
         }
-
-      .big-button {
-        width: 95vw;
-        height: 20vh;
-        margin: 0.1em;
-        padding: 0.1em;
-        font-size: 2em;
-        font-weight: bold;
-        text-align: center;
-        cursor: pointer;
-     }
-
-      .note-name {
-        vertical-align: middle;
-      }
-
-      .selected {
-        background-color: #eee;
-      }
+        .instrument-container {
+            height: 200px;
+            cursor: crosshair;
+            border: solid 1px #eee;
+            position: relative;
+        }
+        .current-event-vector {
+            position: absolute;
+            top: 10px;
+            left: 150px;
+        }
 </style>
-<div>
+<div class="instrument-container">
         <div>
-      <button id="start-demo">Start Demo</button>
-    </div>
-
-    <div class="big-button selected" id="C">
-      <span class="note-name">C</span>
-    </div>
-    <div class="big-button" id="E"><span class="note-name">E</span></div>
-    <div class="big-button" id="G"><span class="note-name">G</span></div>
-    <div class="big-button" id="B"><span class="note-name">B</span></div>
+            <button id="start-demo">Start Demo</button>
+        </div>
+        <div class="current-event-vector">
+            ${renderVector(currentControlPlaneVector)}
+        </div>
 </div>
 `;
         const start = shadow.getElementById('start-demo');
+        const container = shadow.querySelector('.instrument-container');
+        const eventVectorContainer = shadow.querySelector('.current-event-vector');
         const context = new AudioContext({
             sampleRate: 22050,
         });
-        const fetchBinary = (url) => __awaiter(this, void 0, void 0, function* () {
-            const resp = yield fetch(url);
-            return resp.arrayBuffer();
-        });
-        const audioCache = {};
-        const fetchAudio = (url, context) => __awaiter(this, void 0, void 0, function* () {
-            const cached = audioCache[url];
-            if (cached !== undefined) {
-                return cached;
-            }
-            const audioBufferPromise = fetchBinary(url).then(function (data) {
-                return new Promise(function (resolve, reject) {
-                    context.decodeAudioData(data, (buffer) => resolve(buffer), (error) => reject(error));
-                });
-            });
-            audioCache[url] = audioBufferPromise;
-            return audioBufferPromise;
-        });
         const rnnWeightsUrl = this.url;
+        // TODO: Here, we'd like to create a random projection from 2D click location
+        // to control-plane space
+        const scale = 10;
+        const clickProjectionFlat = new Float32Array(2 * 64).map((x) => Math.random() * scale - scale / 2);
+        const clickProjection = twoDimArray(clickProjectionFlat, [64, 2]);
         class ConvUnit {
             constructor(url) {
                 this.url = url;
@@ -160,12 +201,13 @@ export class Instrument extends HTMLElement {
                 this.instrument = null;
                 this.url = url;
             }
-            triggerInstrument(arr) {
+            triggerInstrument(arr, point) {
+                var _a;
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!this.initialized) {
                         yield this.initialize();
                     }
-                    if (this.instrument.port) {
+                    if ((_a = this.instrument) === null || _a === void 0 ? void 0 : _a.port) {
                         this.instrument.port.postMessage(arr);
                     }
                 });
@@ -177,17 +219,19 @@ export class Instrument extends HTMLElement {
                         yield context.audioWorklet.addModule('/build/components/rnn.js');
                     }
                     catch (err) {
-                        console.log('=======================================');
                         console.log(`Failed to add module due to ${err}`);
                     }
-                    const weights = yield fetchRnnWeights(rnnWeightsUrl);
-                    console.log('GOT WEIGHTS', weights);
-                    const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
-                        processorOptions: weights,
-                    });
-                    whiteNoise.connect(context.destination);
-                    this.instrument = whiteNoise;
-                    console.log('DONE initializing', this.gain, this.filt);
+                    try {
+                        const weights = yield fetchRnnWeights(rnnWeightsUrl);
+                        const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
+                            processorOptions: weights,
+                        });
+                        whiteNoise.connect(context.destination);
+                        this.instrument = whiteNoise;
+                    }
+                    catch (err) {
+                        console.log('Failed to initialize instrument');
+                    }
                 });
             }
             updateCutoff(hz) {
@@ -199,7 +243,6 @@ export class Instrument extends HTMLElement {
             trigger(amplitude) {
                 return __awaiter(this, void 0, void 0, function* () {
                     if (!this.initialized) {
-                        console.log('Initializing');
                         yield this.initialize();
                     }
                     if (!this.gain) {
@@ -223,12 +266,11 @@ export class Instrument extends HTMLElement {
                     return accum;
                 }, {});
             }
-            triggerInstrument(arr) {
+            triggerInstrument(arr, point) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
-                console.log('INNER TRIGGER', key, convUnit);
                 if (convUnit) {
-                    convUnit.triggerInstrument(arr);
+                    convUnit.triggerInstrument(arr, point);
                 }
             }
             updateCutoff(hz) {
@@ -246,32 +288,26 @@ export class Instrument extends HTMLElement {
             }
         }
         const activeNotes = new Set(['C']);
-        console.log('ACTIVE NOTES', activeNotes);
         const unit = new Controller(Object.values(notes));
-        const buttons = shadow.querySelectorAll('.big-button');
-        buttons.forEach((button) => {
-            button.addEventListener('click', (event) => {
-                const id = event.target.id;
-                if (!id || id === '') {
-                    return;
-                }
-                console.log(activeNotes);
-                if (activeNotes.has(id)) {
-                    activeNotes.delete(id);
-                    button.classList.remove('selected');
-                }
-                else {
-                    activeNotes.add(id);
-                    button.classList.add('selected');
-                }
-            });
-        });
         const useMouse = () => {
-            document.addEventListener('click', (event) => {
-                const arr = new Float32Array(64).map((x) => Math.random() > 0.9 ? Math.random() * 2 : 0);
-                console.log('OUTER TRIGGER', unit);
+            container.addEventListener('click', (event) => {
                 if (unit) {
-                    unit.triggerInstrument(arr);
+                    const width = container.clientWidth;
+                    const height = container.clientHeight;
+                    // Get click coordinates in [0, 1]
+                    const x = event.offsetX / width;
+                    const y = event.offsetY / height;
+                    // Project click location to control plane space, followed by RELU
+                    const point = { x, y };
+                    console.log('POINT', point);
+                    const pointArr = pointToArray(point);
+                    const proj = dotProduct(pointArr, clickProjection);
+                    const pos = relu(proj);
+                    currentControlPlaneVector.set(pos);
+                    eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
+                    // TODO: I don't actually need to pass the point here, since
+                    // the projection is the only thing that matters
+                    unit.triggerInstrument(proj, { x, y });
                 }
             });
             // document.addEventListener(
@@ -316,6 +352,7 @@ export class Instrument extends HTMLElement {
         };
         start.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
             // useAcc();
+            console.log('BEGINNING MONITORIING');
             useMouse();
             // TODO: How do I get to the button element here?
             // @ts-ignore
