@@ -33,6 +33,16 @@ const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
     return a.map((value, index) => value + b[index]);
 };
 
+const sum = (a: Float32Array): number => {
+    return a.reduce((accum, current) => {
+        return accum + current;
+    }, 0);
+};
+
+const l1Norm = (a: Float32Array): number => {
+    return sum(a.map(Math.abs));
+};
+
 /**
  * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
  * with a new vector of length 128
@@ -118,22 +128,16 @@ class Rnn extends AudioWorkletProcessor {
             this.rnnOutProjection
         );
 
-        // update the hidden state for this "instrument"
-        this.rnnHiddenState = rnnHidden;
-
         const summed = elementwiseSum(rnnInp, rnnHidden);
         const nonlinearity = summed.map(Math.tanh);
+
+        // update the hidden state for this "instrument"
+        this.rnnHiddenState = nonlinearity;
 
         const output = dotProduct(nonlinearity, this.outProjection);
         const withSin = output.map(Math.sin);
 
-        // channels, set a block , since this is k-rate
-        // for (let i = 0; i < left.length; i++) {
-        //     left[i] = withSin[i];
-        // }
-
         left.set(withSin);
-        // right.set(withSin);
 
         return true;
     }

@@ -14,6 +14,14 @@ const vectorVectorDot = (a, b) => {
 const elementwiseSum = (a, b) => {
     return a.map((value, index) => value + b[index]);
 };
+const sum = (a) => {
+    return a.reduce((accum, current) => {
+        return accum + current;
+    }, 0);
+};
+const l1Norm = (a) => {
+    return sum(a.map(Math.abs));
+};
 /**
  * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
  * with a new vector of length 128
@@ -52,18 +60,13 @@ class Rnn extends AudioWorkletProcessor {
         const inp = dotProduct(controlPlane, this.inProjection);
         const rnnInp = dotProduct(inp, this.rnnInProjection);
         const rnnHidden = dotProduct(this.rnnHiddenState, this.rnnOutProjection);
-        // update the hidden state for this "instrument"
-        this.rnnHiddenState = rnnHidden;
         const summed = elementwiseSum(rnnInp, rnnHidden);
         const nonlinearity = summed.map(Math.tanh);
+        // update the hidden state for this "instrument"
+        this.rnnHiddenState = nonlinearity;
         const output = dotProduct(nonlinearity, this.outProjection);
         const withSin = output.map(Math.sin);
-        // channels, set a block , since this is k-rate
-        // for (let i = 0; i < left.length; i++) {
-        //     left[i] = withSin[i];
-        // }
         left.set(withSin);
-        // right.set(withSin);
         return true;
     }
 }

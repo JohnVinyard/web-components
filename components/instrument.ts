@@ -1,10 +1,23 @@
 import { fromNpy } from './numpy';
-import {
-    in_projection,
-    out_projection,
-    rnn_in_projection,
-    rnn_out_projection,
-} from './rnn_weights.json';
+
+interface RawRnnParams {
+    in_projection: string;
+    out_projection: string;
+    rnn_in_projection: string;
+    rnn_out_projection: string;
+}
+
+interface ArrayContainer {
+    array: Float32Array;
+    shape: any;
+}
+
+interface RnnParams {
+    inProjection: ArrayContainer;
+    outProjection: ArrayContainer;
+    rnnInProjection: ArrayContainer;
+    rnnOutProjection: ArrayContainer;
+}
 
 export const tanh = (arr: Float32Array): Float32Array => {
     return arr.map(Math.tanh);
@@ -31,21 +44,51 @@ const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
     return bytes.buffer;
 };
 
-const [inProjection, inProjectionShape] = fromNpy(
-    base64ToArrayBuffer(in_projection)
-);
+const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
+    const resp = await fetch(url);
+    const data = await resp.json();
+    const {
+        in_projection,
+        out_projection,
+        rnn_in_projection,
+        rnn_out_projection,
+    } = data as RawRnnParams;
 
-const [outProjection, outProjectionShape] = fromNpy(
-    base64ToArrayBuffer(out_projection)
-);
+    const [inProjection, inProjectionShape] = fromNpy(
+        base64ToArrayBuffer(in_projection)
+    );
 
-const [rnnInProjection, rnnInProjectionShape] = fromNpy(
-    base64ToArrayBuffer(rnn_in_projection)
-);
+    const [outProjection, outProjectionShape] = fromNpy(
+        base64ToArrayBuffer(out_projection)
+    );
 
-const [rnnOutProjection, rnnOutProjectionShape] = fromNpy(
-    base64ToArrayBuffer(rnn_out_projection)
-);
+    const [rnnInProjection, rnnInProjectionShape] = fromNpy(
+        base64ToArrayBuffer(rnn_in_projection)
+    );
+
+    const [rnnOutProjection, rnnOutProjectionShape] = fromNpy(
+        base64ToArrayBuffer(rnn_out_projection)
+    );
+
+    return {
+        inProjection: {
+            array: inProjection as Float32Array,
+            shape: inProjectionShape,
+        },
+        outProjection: {
+            array: outProjection as Float32Array,
+            shape: outProjectionShape,
+        },
+        rnnInProjection: {
+            array: rnnInProjection as Float32Array,
+            shape: rnnInProjectionShape,
+        },
+        rnnOutProjection: {
+            array: rnnOutProjection as Float32Array,
+            shape: rnnOutProjectionShape,
+        },
+    };
+};
 
 class Interval {
     public readonly range: number;
@@ -77,8 +120,11 @@ const vertical = new Interval(0, window.innerHeight);
 const unitInterval = new Interval(0, 1);
 
 export class Instrument extends HTMLElement {
+    public url: string | null = null;
+
     constructor() {
         super();
+        this.url = null;
     }
 
     private render() {
@@ -163,6 +209,8 @@ export class Instrument extends HTMLElement {
             return audioBufferPromise;
         };
 
+        const rnnWeightsUrl = this.url;
+
         class ConvUnit {
             private initialized: boolean = false;
             private gain: GainNode | null = null;
@@ -195,51 +243,19 @@ export class Instrument extends HTMLElement {
                     console.log(`Failed to add module due to ${err}`);
                 }
 
-                // const osc = context.createOscillator();
+                const weights = await fetchRnnWeights(rnnWeightsUrl);
+                console.log('GOT WEIGHTS', weights);
+
                 const whiteNoise = new AudioWorkletNode(
                     context,
                     'rnn-instrument',
                     {
-                        processorOptions: {
-                            inProjection: {
-                                array: inProjection,
-                                shape: inProjectionShape,
-                            },
-                            outProjection: {
-                                array: outProjection,
-                                shape: outProjectionShape,
-                            },
-                            rnnInProjection: {
-                                array: rnnInProjection,
-                                shape: rnnInProjectionShape,
-                            },
-                            rnnOutProjection: {
-                                array: rnnOutProjection,
-                                shape: rnnOutProjectionShape,
-                            },
-                        },
+                        processorOptions: weights,
                     }
                 );
 
-                // const gainNode = context.createGain();
-                // const conv = context.createConvolver();
-
-                // const filter = context.createBiquadFilter();
-                // filter.type = 'lowpass';
-                // filter.frequency.setValueAtTime(500, context.currentTime);
-
-                // conv.buffer = await fetchAudio(this.url, context);
-
-                // osc.connect(whiteNoise);
-                // whiteNoise.connect(gainNode);
-                // gainNode.connect(conv);
-                // conv.connect(filter);
-                // filter.connect(context.destination);
-                // osc.start();
                 whiteNoise.connect(context.destination);
 
-                // this.gain = gainNode;
-                // this.filt = filter;
                 this.instrument = whiteNoise;
 
                 console.log('DONE initializing', this.gain, this.filt);
@@ -430,7 +446,7 @@ export class Instrument extends HTMLElement {
     }
 
     public static get observedAttributes(): (keyof Instrument)[] {
-        return [];
+        return ['url'];
     }
 
     public attributeChangedCallback(
