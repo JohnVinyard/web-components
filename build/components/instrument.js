@@ -136,8 +136,8 @@ export class Instrument extends HTMLElement {
                 const scaled = shifted / (currentControlPlaneSpan + 1e-8);
                 return scaled;
             });
-            const vectorElementHeight = 20;
-            const vectorElementWidth = 20;
+            const vectorElementHeight = 10;
+            const vectorElementWidth = 10;
             const valueToRgb = (x) => {
                 const eightBit = x * 255;
                 return `rgba(${eightBit}, ${eightBit}, ${eightBit}, 1.0)`;
@@ -299,7 +299,6 @@ export class Instrument extends HTMLElement {
                     const y = event.offsetY / height;
                     // Project click location to control plane space, followed by RELU
                     const point = { x, y };
-                    console.log('POINT', point);
                     const pointArr = pointToArray(point);
                     const proj = dotProduct(pointArr, clickProjection);
                     const pos = relu(proj);
