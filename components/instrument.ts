@@ -298,15 +298,19 @@ export class Instrument extends HTMLElement {
                     return zeros(64);
                 }
 
-                const proj = dotProduct(clickPoint, this.weights);
-                const sparse = relu(proj);
-                console.log(
-                    'CONTROL PLANE',
-                    sparse,
-                    this.weights.length,
-                    this.weights[0].length
+                return new Float32Array(64).map(
+                    (x) => (Math.random() * 2 - 1) * 10
                 );
-                return sparse;
+
+                // const proj = dotProduct(clickPoint, this.weights);
+                // const sparse = relu(proj);
+                // console.log(
+                //     'CONTROL PLANE',
+                //     sparse,
+                //     this.weights.length,
+                //     this.weights[0].length
+                // );
+                // return sparse;
             }
 
             async shutdown() {
