@@ -272,13 +272,18 @@ export class Instrument extends HTMLElement {
         .instrument-container {
             height: 200px;
             cursor: pointer;
-            border: solid 1px #eee;
             position: relative;
+            -webkit-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
+            -moz-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
+            box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
         }
         .current-event-vector {
             position: absolute;
             top: 10px;
             left: 150px;
+        }
+        p {
+            margin-left: 10px;
         }
 </style>
 <div class="instrument-container">
