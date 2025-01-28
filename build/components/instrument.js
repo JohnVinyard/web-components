@@ -223,7 +223,7 @@ export class Instrument extends HTMLElement {
                     }
                     try {
                         const weights = yield fetchRnnWeights(rnnWeightsUrl);
-                        this.weights = twoDimArray(weights.controlPlaneMapping.array, [2, 64]);
+                        this.weights = twoDimArray(weights.controlPlaneMapping.array, [64, 2]);
                         const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                             processorOptions: weights,
                         });
