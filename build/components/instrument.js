@@ -31,6 +31,9 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
+const zeros = (size) => {
+    return new Float32Array(size).fill(0);
+};
 const vectorVectorDot = (a, b) => {
     return a.reduce((accum, current, index) => {
         return accum + current * b[index];
@@ -231,7 +234,7 @@ export class Instrument extends HTMLElement {
             }
             projectClick(clickPoint) {
                 if (!this.weights) {
-                    return new Float32Array(64).fill(0);
+                    return zeros(64);
                 }
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
@@ -286,7 +289,7 @@ export class Instrument extends HTMLElement {
                 if (convUnit) {
                     convUnit.projectClick(point);
                 }
-                throw new Error('Missing weights');
+                return zeros(64);
             }
             triggerInstrument(arr, point) {
                 const key = notes['C'];
