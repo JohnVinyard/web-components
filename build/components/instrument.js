@@ -161,7 +161,7 @@ export class Instrument extends HTMLElement {
             <button id="stop-demo" disabled>Stop</button>
         </div>
         <p>
-            2D click coordinates will be projected into control-plane space
+            Sparse control-plane vectors are chosen at random when you click
         </p>
         <div class="current-event-vector" title="Most recent control-plane input vector">
             ${renderVector(currentControlPlaneVector)}
@@ -201,7 +201,7 @@ export class Instrument extends HTMLElement {
                 if (!this.weights) {
                     return zeros(64);
                 }
-                return new Float32Array(64).map((x) => (Math.random() * 2 - 1) * 10);
+                return new Float32Array(64).map((x) => Math.random() > 0.9 ? (Math.random() * 2 - 1) * 10 : 0);
                 // const proj = dotProduct(clickPoint, this.weights);
                 // const sparse = relu(proj);
                 // console.log(
