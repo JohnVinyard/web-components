@@ -203,7 +203,7 @@ export class Instrument extends HTMLElement {
                 }
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
-                console.log('CONTROL PLANE', sparse);
+                console.log('CONTROL PLANE', sparse, this.weights.length, this.weights[0].length);
                 return sparse;
             }
             shutdown() {
@@ -278,6 +278,7 @@ export class Instrument extends HTMLElement {
                 // // Project click location to control plane space, followed by RELU
                 const point = { x, y };
                 const pointArr = pointToArray(point);
+                console.log(pointArr);
                 const pos = unit.projectClick(pointArr);
                 currentControlPlaneVector.set(pos);
                 eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
