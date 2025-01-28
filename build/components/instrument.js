@@ -36,17 +36,6 @@ const vectorVectorDot = (a, b) => {
         return accum + current * b[index];
     }, 0);
 };
-// const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
-//     return a.map((value, index) => value + b[index]);
-// };
-// const sum = (a: Float32Array): number => {
-//     return a.reduce((accum, current) => {
-//         return accum + current;
-//     }, 0);
-// };
-// const l1Norm = (a: Float32Array): number => {
-//     return sum(a.map(Math.abs));
-// };
 /**
  * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
  * with a new vector of length 128
@@ -57,14 +46,17 @@ const dotProduct = (vector, matrix) => {
 const relu = (vector) => {
     return vector.map((x) => Math.max(0, x));
 };
-const oneHot = (vector) => {
-    const output = new Float32Array(vector.length).fill(0);
-    const [mx, index] = vector.reduce(([mx, idx], current, index) => {
-        return current > mx ? [current, index] : [mx, idx];
-    }, [0, 0]);
-    output[index] = vector[index];
-    return output;
-};
+// const oneHot = (vector: Float32Array): Float32Array => {
+//     const output = new Float32Array(vector.length).fill(0);
+//     const [mx, index] = vector.reduce(
+//         ([mx, idx]: [number, number], current, index) => {
+//             return current > mx ? [current, index] : [mx, idx];
+//         },
+//         [0, 0]
+//     );
+//     output[index] = vector[index];
+//     return output;
+// };
 const base64ToArrayBuffer = (base64) => {
     var binaryString = atob(base64);
     var bytes = new Uint8Array(binaryString.length);
@@ -105,29 +97,28 @@ const fetchRnnWeights = (url) => __awaiter(void 0, void 0, void 0, function* () 
         },
     };
 });
-class Interval {
-    constructor(start, end) {
-        this.start = start;
-        this.end = end;
-        this.start = start;
-        this.end = end;
-        this.range = end - start;
-    }
-    toRatio(value) {
-        return (value - this.start) / this.range;
-    }
-    fromRatio(value) {
-        return this.start + value * this.range;
-    }
-    translateTo(value, otherInterval) {
-        const r = this.toRatio(value);
-        const v = otherInterval.fromRatio(r);
-        return v;
-    }
-}
-const filterCutoff = new Interval(500, 22050);
-const gamma = new Interval(-90, 90);
-const unitInterval = new Interval(0, 1);
+// class Interval {
+//     public readonly range: number;
+//     constructor(public readonly start: number, public readonly end: number) {
+//         this.start = start;
+//         this.end = end;
+//         this.range = end - start;
+//     }
+//     toRatio(value: number): number {
+//         return (value - this.start) / this.range;
+//     }
+//     fromRatio(value: number): number {
+//         return this.start + value * this.range;
+//     }
+//     translateTo(value: number, otherInterval: Interval): number {
+//         const r = this.toRatio(value);
+//         const v = otherInterval.fromRatio(r);
+//         return v;
+//     }
+// }
+// const filterCutoff = new Interval(500, 22050);
+// const gamma = new Interval(-90, 90);
+// const unitInterval = new Interval(0, 1);
 export class Instrument extends HTMLElement {
     constructor() {
         super();
@@ -175,18 +166,24 @@ export class Instrument extends HTMLElement {
         .instrument-container {
             height: 200px;
             cursor: pointer;
-            border: solid 1px #eee;
             position: relative;
+            -webkit-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
+            -moz-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
+            box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
         }
         .current-event-vector {
             position: absolute;
             top: 10px;
             left: 150px;
         }
+        p {
+            margin-left: 10px;
+        }
 </style>
 <div class="instrument-container">
         <div>
             <button id="start-demo">Start Demo</button>
+            <button id="stop-demo" disabled>Stop</button>
         </div>
         <p>
             2D click coordinates will be projected into control-plane space
@@ -197,6 +194,7 @@ export class Instrument extends HTMLElement {
 </div>
 `;
         const start = shadow.getElementById('start-demo');
+        const stop = shadow.getElementById('stop-demo');
         const container = shadow.querySelector('.instrument-container');
         const eventVectorContainer = shadow.querySelector('.current-event-vector');
         const context = new AudioContext({
@@ -205,9 +203,11 @@ export class Instrument extends HTMLElement {
         const rnnWeightsUrl = this.url;
         // TODO: Here, we'd like to create a random projection from 2D click location
         // to control-plane space
-        const scale = 10;
-        const clickProjectionFlat = new Float32Array(2 * 64).map((x) => Math.random() * scale - scale / 2);
-        const clickProjection = twoDimArray(clickProjectionFlat, [64, 2]);
+        // const scale = 10;
+        // const clickProjectionFlat = new Float32Array(2 * 64).map(
+        //     (x) => Math.random() * scale - scale / 2
+        // );
+        // const clickProjection = twoDimArray(clickProjectionFlat, [64, 2]);
         class ConvUnit {
             constructor(url) {
                 this.url = url;
@@ -230,9 +230,18 @@ export class Instrument extends HTMLElement {
                 });
             }
             projectClick(clickPoint) {
+                if (!this.weights) {
+                    return new Float32Array(64).fill(0);
+                }
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
                 return sparse;
+            }
+            shutdown() {
+                return __awaiter(this, void 0, void 0, function* () {
+                    this.instrument.disconnect();
+                    this.initialized = false;
+                });
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
@@ -289,30 +298,31 @@ export class Instrument extends HTMLElement {
         }
         // const activeNotes = new Set(['C']);
         const unit = new Controller(Object.values(notes));
+        const clickHandler = (event) => {
+            if (unit) {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                // // Get click coordinates in [0, 1]
+                const x = event.offsetX / width;
+                const y = event.offsetY / height;
+                // // Project click location to control plane space, followed by RELU
+                const point = { x, y };
+                const pointArr = pointToArray(point);
+                const pos = unit.projectClick(pointArr);
+                // const proj = dotProduct(pointArr, clickProjection);
+                // const pos = relu(proj);
+                // const pos = new Float32Array(64).map((x) =>
+                //     Math.random() > 0.9 ? Math.random() * 2 : 0
+                // );
+                currentControlPlaneVector.set(pos);
+                eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
+                // TODO: I don't actually need to pass the point here, since
+                // the projection is the only thing that matters
+                unit.triggerInstrument(pos, { x, y });
+            }
+        };
         const useMouse = () => {
-            container.addEventListener('click', (event) => {
-                if (unit) {
-                    const width = container.clientWidth;
-                    const height = container.clientHeight;
-                    // // Get click coordinates in [0, 1]
-                    const x = event.offsetX / width;
-                    const y = event.offsetY / height;
-                    // // Project click location to control plane space, followed by RELU
-                    const point = { x, y };
-                    const pointArr = pointToArray(point);
-                    const pos = unit.projectClick(pointArr);
-                    // const proj = dotProduct(pointArr, clickProjection);
-                    // const pos = relu(proj);
-                    // const pos = new Float32Array(64).map((x) =>
-                    //     Math.random() > 0.9 ? Math.random() * 2 : 0
-                    // );
-                    currentControlPlaneVector.set(pos);
-                    eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
-                    // TODO: I don't actually need to pass the point here, since
-                    // the projection is the only thing that matters
-                    unit.triggerInstrument(pos, { x, y });
-                }
-            });
+            container.addEventListener('click', clickHandler);
             // document.addEventListener(
             //     'mousemove',
             //     ({ movementX, movementY, clientX, clientY }) => {
@@ -330,13 +340,25 @@ export class Instrument extends HTMLElement {
         };
         const useAcc = () => {
             if (DeviceMotionEvent) {
-                window.addEventListener('deviceorientationabsolute', (event) => {
-                    const u = gamma.translateTo(event.gamma, unitInterval);
-                    const hz = unitInterval.translateTo(Math.pow(u, 4), filterCutoff);
-                    // unit.updateCutoff(hz);
-                });
+                // window.addEventListener(
+                //     'deviceorientationabsolute',
+                //     (event) => {
+                //         const u = gamma.translateTo(event.gamma, unitInterval);
+                //         const hz = unitInterval.translateTo(
+                //             u ** 4,
+                //             filterCutoff
+                //         );
+                //         // unit.updateCutoff(hz);
+                //     }
+                // );
                 window.addEventListener('devicemotion', (event) => {
                     const threshold = 4;
+                    /**
+                     * TODO:
+                     *
+                     * - settable thresholds for spacing in time as well as norm of motion
+                     * - project the 3D acceleration vector
+                     */
                     // TODO: maybe this trigger condition should be the norm as well?
                     if (Math.abs(event.acceleration.x) > threshold ||
                         Math.abs(event.acceleration.y) > threshold ||
@@ -363,6 +385,12 @@ export class Instrument extends HTMLElement {
             // TODO: How do I get to the button element here?
             // @ts-ignore
             event.target.disabled = true;
+            stop.disabled = false;
+        }));
+        stop.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
+            stop.disabled = true;
+            start.disabled = false;
+            container.removeEventListener('click', clickHandler);
         }));
     }
     connectedCallback() {
