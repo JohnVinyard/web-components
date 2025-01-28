@@ -203,6 +203,7 @@ export class Instrument extends HTMLElement {
                 }
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
+                console.log('CONTROL PLANE', sparse);
                 return sparse;
             }
             shutdown() {
