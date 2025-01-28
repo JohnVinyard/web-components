@@ -59,6 +59,10 @@ const twoDimArray = (
     return output;
 };
 
+const zeros = (size: number): Float32Array => {
+    return new Float32Array(size).fill(0);
+};
+
 const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
     return a.reduce((accum, current, index) => {
         return accum + current * b[index];
@@ -331,7 +335,7 @@ export class Instrument extends HTMLElement {
 
             public projectClick(clickPoint: Float32Array): Float32Array {
                 if (!this.weights) {
-                    return new Float32Array(64).fill(0);
+                    return zeros(64);
                 }
 
                 const proj = dotProduct(clickPoint, this.weights);
@@ -432,7 +436,7 @@ export class Instrument extends HTMLElement {
                     convUnit.projectClick(point);
                 }
 
-                throw new Error('Missing weights');
+                return zeros(64);
             }
 
             public triggerInstrument(arr: Float32Array, point: Point) {
