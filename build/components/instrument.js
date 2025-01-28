@@ -76,11 +76,12 @@ const base64ToArrayBuffer = (base64) => {
 const fetchRnnWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
     const data = yield resp.json();
-    const { in_projection, out_projection, rnn_in_projection, rnn_out_projection, } = data;
+    const { in_projection, out_projection, rnn_in_projection, rnn_out_projection, control_plane_mapping, } = data;
     const [inProjection, inProjectionShape] = fromNpy(base64ToArrayBuffer(in_projection));
     const [outProjection, outProjectionShape] = fromNpy(base64ToArrayBuffer(out_projection));
     const [rnnInProjection, rnnInProjectionShape] = fromNpy(base64ToArrayBuffer(rnn_in_projection));
     const [rnnOutProjection, rnnOutProjectionShape] = fromNpy(base64ToArrayBuffer(rnn_out_projection));
+    const [controlPlaneMapping, controlPlaneMappingShape] = fromNpy(base64ToArrayBuffer(control_plane_mapping));
     return {
         inProjection: {
             array: inProjection,
@@ -97,6 +98,10 @@ const fetchRnnWeights = (url) => __awaiter(void 0, void 0, void 0, function* () 
         rnnOutProjection: {
             array: rnnOutProjection,
             shape: rnnOutProjectionShape,
+        },
+        controlPlaneMapping: {
+            array: controlPlaneMapping,
+            shape: controlPlaneMappingShape,
         },
     };
 });
@@ -169,7 +174,7 @@ export class Instrument extends HTMLElement {
         }
         .instrument-container {
             height: 200px;
-            cursor: crosshair;
+            cursor: pointer;
             border: solid 1px #eee;
             position: relative;
         }
@@ -183,7 +188,10 @@ export class Instrument extends HTMLElement {
         <div>
             <button id="start-demo">Start Demo</button>
         </div>
-        <div class="current-event-vector">
+        <p>
+            2D click coordinates will be projected into control-plane space
+        </p>
+        <div class="current-event-vector" title="Most recent control-plane input vector">
             ${renderVector(currentControlPlaneVector)}
         </div>
 </div>
@@ -204,9 +212,10 @@ export class Instrument extends HTMLElement {
             constructor(url) {
                 this.url = url;
                 this.initialized = false;
-                this.gain = null;
-                this.filt = null;
+                // private gain: GainNode | null = null;
+                // private filt: BiquadFilterNode | null = null;
                 this.instrument = null;
+                this.weights = null;
                 this.url = url;
             }
             triggerInstrument(arr, point) {
@@ -220,6 +229,11 @@ export class Instrument extends HTMLElement {
                     }
                 });
             }
+            projectClick(clickPoint) {
+                const proj = dotProduct(clickPoint, this.weights);
+                const sparse = relu(proj);
+                return sparse;
+            }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
                     this.initialized = true;
@@ -231,6 +245,7 @@ export class Instrument extends HTMLElement {
                     }
                     try {
                         const weights = yield fetchRnnWeights(rnnWeightsUrl);
+                        this.weights = twoDimArray(weights.controlPlaneMapping.array, [2, 64]);
                         const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                             processorOptions: weights,
                         });
@@ -240,24 +255,6 @@ export class Instrument extends HTMLElement {
                     catch (err) {
                         console.log('Failed to initialize instrument');
                     }
-                });
-            }
-            updateCutoff(hz) {
-                if (!this.filt) {
-                    return;
-                }
-                this.filt.frequency.exponentialRampToValueAtTime(hz, context.currentTime + 0.05);
-            }
-            trigger(amplitude) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    if (!this.initialized) {
-                        yield this.initialize();
-                    }
-                    if (!this.gain) {
-                        return;
-                    }
-                    this.gain.gain.exponentialRampToValueAtTime(amplitude, context.currentTime + 0.001);
-                    this.gain.gain.exponentialRampToValueAtTime(0.000001, context.currentTime + 0.2);
                 });
             }
         }
@@ -274,6 +271,14 @@ export class Instrument extends HTMLElement {
                     return accum;
                 }, {});
             }
+            projectClick(point) {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    convUnit.projectClick(point);
+                }
+                throw new Error('Missing weights');
+            }
             triggerInstrument(arr, point) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
@@ -281,21 +286,8 @@ export class Instrument extends HTMLElement {
                     convUnit.triggerInstrument(arr, point);
                 }
             }
-            updateCutoff(hz) {
-                for (const key in this.units) {
-                    const u = this.units[key];
-                    u.updateCutoff(hz);
-                }
-            }
-            trigger(urls, amplitude) {
-                return __awaiter(this, void 0, void 0, function* () {
-                    urls.forEach((url) => {
-                        this.units[url].trigger(amplitude);
-                    });
-                });
-            }
         }
-        const activeNotes = new Set(['C']);
+        // const activeNotes = new Set(['C']);
         const unit = new Controller(Object.values(notes));
         const useMouse = () => {
             container.addEventListener('click', (event) => {
@@ -308,8 +300,9 @@ export class Instrument extends HTMLElement {
                     // // Project click location to control plane space, followed by RELU
                     const point = { x, y };
                     const pointArr = pointToArray(point);
-                    const proj = dotProduct(pointArr, clickProjection);
-                    const pos = relu(proj);
+                    const pos = unit.projectClick(pointArr);
+                    // const proj = dotProduct(pointArr, clickProjection);
+                    // const pos = relu(proj);
                     // const pos = new Float32Array(64).map((x) =>
                     //     Math.random() > 0.9 ? Math.random() * 2 : 0
                     // );
@@ -340,7 +333,7 @@ export class Instrument extends HTMLElement {
                 window.addEventListener('deviceorientationabsolute', (event) => {
                     const u = gamma.translateTo(event.gamma, unitInterval);
                     const hz = unitInterval.translateTo(Math.pow(u, 4), filterCutoff);
-                    unit.updateCutoff(hz);
+                    // unit.updateCutoff(hz);
                 });
                 window.addEventListener('devicemotion', (event) => {
                     const threshold = 4;
@@ -351,7 +344,10 @@ export class Instrument extends HTMLElement {
                         const norm = Math.sqrt(Math.pow(event.acceleration.x, 2) +
                             Math.pow(event.acceleration.y, 2) +
                             Math.pow(event.acceleration.z, 2));
-                        unit.trigger(Array.from(activeNotes).map((an) => notes[an]), norm * 0.2);
+                        // unit.trigger(
+                        //     Array.from(activeNotes).map((an) => notes[an]),
+                        //     norm * 0.2
+                        // );
                     }
                 }, true);
             }

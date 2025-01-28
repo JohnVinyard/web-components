@@ -5,6 +5,7 @@ interface RawRnnParams {
     out_projection: string;
     rnn_in_projection: string;
     rnn_out_projection: string;
+    control_plane_mapping: string;
 }
 
 interface ArrayContainer {
@@ -17,6 +18,7 @@ interface RnnParams {
     outProjection: ArrayContainer;
     rnnInProjection: ArrayContainer;
     rnnOutProjection: ArrayContainer;
+    controlPlaneMapping: ArrayContainer;
 }
 
 interface Point {
@@ -123,6 +125,7 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         out_projection,
         rnn_in_projection,
         rnn_out_projection,
+        control_plane_mapping,
     } = data as RawRnnParams;
 
     const [inProjection, inProjectionShape] = fromNpy(
@@ -141,6 +144,10 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         base64ToArrayBuffer(rnn_out_projection)
     );
 
+    const [controlPlaneMapping, controlPlaneMappingShape] = fromNpy(
+        base64ToArrayBuffer(control_plane_mapping)
+    );
+
     return {
         inProjection: {
             array: inProjection as Float32Array,
@@ -157,6 +164,10 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         rnnOutProjection: {
             array: rnnOutProjection as Float32Array,
             shape: rnnOutProjectionShape,
+        },
+        controlPlaneMapping: {
+            array: controlPlaneMapping as Float32Array,
+            shape: controlPlaneMappingShape,
         },
     };
 };
@@ -260,7 +271,7 @@ export class Instrument extends HTMLElement {
         }
         .instrument-container {
             height: 200px;
-            cursor: crosshair;
+            cursor: pointer;
             border: solid 1px #eee;
             position: relative;
         }
@@ -274,7 +285,10 @@ export class Instrument extends HTMLElement {
         <div>
             <button id="start-demo">Start Demo</button>
         </div>
-        <div class="current-event-vector">
+        <p>
+            2D click coordinates will be projected into control-plane space
+        </p>
+        <div class="current-event-vector" title="Most recent control-plane input vector">
             ${renderVector(currentControlPlaneVector)}
         </div>
 </div>
@@ -303,9 +317,10 @@ export class Instrument extends HTMLElement {
 
         class ConvUnit {
             private initialized: boolean = false;
-            private gain: GainNode | null = null;
-            private filt: BiquadFilterNode | null = null;
+            // private gain: GainNode | null = null;
+            // private filt: BiquadFilterNode | null = null;
             private instrument: AudioWorkletNode | null = null;
+            private weights: Float32Array[] | null = null;
 
             constructor(public readonly url: string) {
                 this.url = url;
@@ -321,6 +336,12 @@ export class Instrument extends HTMLElement {
                 }
             }
 
+            public projectClick(clickPoint: Float32Array): Float32Array {
+                const proj = dotProduct(clickPoint, this.weights);
+                const sparse = relu(proj);
+                return sparse;
+            }
+
             async initialize() {
                 this.initialized = true;
 
@@ -334,6 +355,10 @@ export class Instrument extends HTMLElement {
 
                 try {
                     const weights = await fetchRnnWeights(rnnWeightsUrl);
+                    this.weights = twoDimArray(
+                        weights.controlPlaneMapping.array,
+                        [2, 64]
+                    );
 
                     const whiteNoise = new AudioWorkletNode(
                         context,
@@ -344,42 +369,41 @@ export class Instrument extends HTMLElement {
                     );
 
                     whiteNoise.connect(context.destination);
-
                     this.instrument = whiteNoise;
                 } catch (err) {
                     console.log('Failed to initialize instrument');
                 }
             }
 
-            updateCutoff(hz: number) {
-                if (!this.filt) {
-                    return;
-                }
+            // updateCutoff(hz: number) {
+            //     if (!this.filt) {
+            //         return;
+            //     }
 
-                this.filt.frequency.exponentialRampToValueAtTime(
-                    hz,
-                    context.currentTime + 0.05
-                );
-            }
+            //     this.filt.frequency.exponentialRampToValueAtTime(
+            //         hz,
+            //         context.currentTime + 0.05
+            //     );
+            // }
 
-            async trigger(amplitude: number) {
-                if (!this.initialized) {
-                    await this.initialize();
-                }
+            // async trigger(amplitude: number) {
+            //     if (!this.initialized) {
+            //         await this.initialize();
+            //     }
 
-                if (!this.gain) {
-                    return;
-                }
+            //     if (!this.gain) {
+            //         return;
+            //     }
 
-                this.gain.gain.exponentialRampToValueAtTime(
-                    amplitude,
-                    context.currentTime + 0.001
-                );
-                this.gain.gain.exponentialRampToValueAtTime(
-                    0.000001,
-                    context.currentTime + 0.2
-                );
-            }
+            //     this.gain.gain.exponentialRampToValueAtTime(
+            //         amplitude,
+            //         context.currentTime + 0.001
+            //     );
+            //     this.gain.gain.exponentialRampToValueAtTime(
+            //         0.000001,
+            //         context.currentTime + 0.2
+            //     );
+            // }
         }
 
         const notes: Record<string, string> = {
@@ -399,6 +423,16 @@ export class Instrument extends HTMLElement {
                 }, {});
             }
 
+            public projectClick(point: Float32Array): Float32Array {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    convUnit.projectClick(point);
+                }
+
+                throw new Error('Missing weights');
+            }
+
             public triggerInstrument(arr: Float32Array, point: Point) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
@@ -407,21 +441,21 @@ export class Instrument extends HTMLElement {
                 }
             }
 
-            updateCutoff(hz: number) {
-                for (const key in this.units) {
-                    const u = this.units[key];
-                    u.updateCutoff(hz);
-                }
-            }
+            // updateCutoff(hz: number) {
+            //     for (const key in this.units) {
+            //         const u = this.units[key];
+            //         u.updateCutoff(hz);
+            //     }
+            // }
 
-            async trigger(urls: string[], amplitude: number) {
-                urls.forEach((url) => {
-                    this.units[url].trigger(amplitude);
-                });
-            }
+            // async trigger(urls: string[], amplitude: number) {
+            //     urls.forEach((url) => {
+            //         this.units[url].trigger(amplitude);
+            //     });
+            // }
         }
 
-        const activeNotes = new Set(['C']);
+        // const activeNotes = new Set(['C']);
 
         const unit = new Controller(Object.values(notes));
 
@@ -438,8 +472,11 @@ export class Instrument extends HTMLElement {
                     // // Project click location to control plane space, followed by RELU
                     const point: Point = { x, y };
                     const pointArr = pointToArray(point);
-                    const proj = dotProduct(pointArr, clickProjection);
-                    const pos = relu(proj);
+
+                    const pos = unit.projectClick(pointArr);
+
+                    // const proj = dotProduct(pointArr, clickProjection);
+                    // const pos = relu(proj);
 
                     // const pos = new Float32Array(64).map((x) =>
                     //     Math.random() > 0.9 ? Math.random() * 2 : 0
@@ -484,7 +521,7 @@ export class Instrument extends HTMLElement {
                             u ** 4,
                             filterCutoff
                         );
-                        unit.updateCutoff(hz);
+                        // unit.updateCutoff(hz);
                     }
                 );
 
@@ -505,10 +542,10 @@ export class Instrument extends HTMLElement {
                                     event.acceleration.z ** 2
                             );
 
-                            unit.trigger(
-                                Array.from(activeNotes).map((an) => notes[an]),
-                                norm * 0.2
-                            );
+                            // unit.trigger(
+                            //     Array.from(activeNotes).map((an) => notes[an]),
+                            //     norm * 0.2
+                            // );
                         }
                     },
                     true
