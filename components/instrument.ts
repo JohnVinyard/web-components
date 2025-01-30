@@ -501,10 +501,27 @@ export class Instrument extends HTMLElement {
                 //     }
                 // );
 
+                const position = new Float32Array([0, 0, 0]);
+                const velocity = new Float32Array([0, 0, 0]);
+
                 window.addEventListener(
                     'devicemotion',
                     (event) => {
                         const threshold = 4;
+
+                        const accelerationVector = new Float32Array([
+                            event.acceleration.x,
+                            event.acceleration.y,
+                            event.acceleration.z,
+                        ]);
+
+                        // compute new velocity
+                        const v = elementwiseSum(accelerationVector, velocity);
+                        velocity.set(v);
+
+                        // compute new position
+                        const newPos = elementwiseSum(position, v);
+                        position.set(newPos);
 
                         /**
                          * TODO:
@@ -525,13 +542,8 @@ export class Instrument extends HTMLElement {
                             //         event.acceleration.z ** 2
                             // );
 
-                            const accelerationVector = new Float32Array([
-                                event.acceleration.x,
-                                event.acceleration.y,
-                                event.acceleration.z,
-                            ]);
                             const controlPlane =
-                                unit.projectAcceleration(accelerationVector);
+                                unit.projectAcceleration(newPos);
                             currentControlPlaneVector.set(controlPlane);
                             eventVectorContainer.innerHTML = renderVector(
                                 currentControlPlaneVector
