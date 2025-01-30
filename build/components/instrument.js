@@ -146,6 +146,9 @@ export class Instrument extends HTMLElement {
             -moz-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
             box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
         }
+        .instrument-container.initialized {
+            background-color: #00ff00;
+        }
         .current-event-vector {
             position: absolute;
             top: 10px;
@@ -248,7 +251,9 @@ export class Instrument extends HTMLElement {
                     }
                     catch (err) {
                         console.log('Failed to initialize instrument');
+                        alert(`Failed to initialize instrument due to ${err}`);
                     }
+                    container.classList.add('intialized');
                 });
             }
         }
