@@ -270,7 +270,7 @@ export class Instrument extends HTMLElement {
         );
 
         const context = new AudioContext({
-            // sampleRate: 22050,
+            sampleRate: 22050,
         });
 
         const rnnWeightsUrl = this.url;

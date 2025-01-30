@@ -176,7 +176,7 @@ export class Instrument extends HTMLElement {
         const container = shadow.querySelector('.instrument-container');
         const eventVectorContainer = shadow.querySelector('.current-event-vector');
         const context = new AudioContext({
-        // sampleRate: 22050,
+            sampleRate: 22050,
         });
         const rnnWeightsUrl = this.url;
         class ConvUnit {
