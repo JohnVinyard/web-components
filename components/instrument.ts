@@ -269,10 +269,6 @@ export class Instrument extends HTMLElement {
             '.current-event-vector'
         );
 
-        const context = new AudioContext({
-            sampleRate: 22050,
-        });
-
         const rnnWeightsUrl = this.url;
 
         class ConvUnit {
@@ -334,10 +330,14 @@ export class Instrument extends HTMLElement {
 
             async initialize() {
                 this.initialized = true;
+                const context = new AudioContext({
+                    sampleRate: 22050,
+                });
 
                 try {
                     await context.audioWorklet.addModule(
-                        '/build/components/rnn.js'
+                        // '/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.47/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);

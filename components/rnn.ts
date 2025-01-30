@@ -112,37 +112,37 @@ class Rnn extends AudioWorkletProcessor {
         // const right = outputs[0][1];
 
         // see if there's an "event" in the queue
-        // const maybeControlPlane: Float32Array | undefined =
-        //     this.eventQueue.shift();
+        const maybeControlPlane: Float32Array | undefined =
+            this.eventQueue.shift();
 
-        // // https://pytorch.org/docs/stable/generated/torch.nn.RNN.html
+        // https://pytorch.org/docs/stable/generated/torch.nn.RNN.html
 
-        // const controlPlane =
-        //     maybeControlPlane ?? new Float32Array(this.controlPlaneDim).fill(0);
+        const controlPlane =
+            maybeControlPlane ?? new Float32Array(this.controlPlaneDim).fill(0);
 
-        // const inp = dotProduct(controlPlane, this.inProjection);
+        const inp = dotProduct(controlPlane, this.inProjection);
 
-        // const rnnInp = dotProduct(inp, this.rnnInProjection);
+        const rnnInp = dotProduct(inp, this.rnnInProjection);
 
-        // const rnnHidden = dotProduct(
-        //     this.rnnHiddenState,
-        //     this.rnnOutProjection
-        // );
-
-        // const summed = elementwiseSum(rnnInp, rnnHidden);
-        // const nonlinearity = summed.map(Math.tanh);
-
-        // // update the hidden state for this "instrument"
-        // this.rnnHiddenState = nonlinearity;
-
-        // const output = dotProduct(nonlinearity, this.outProjection);
-        // const withSin = output.map(Math.sin);
-
-        // left.set(withSin);
-
-        left.set(
-            new Float32Array(left.length).map((x) => Math.random() * 2 - 1)
+        const rnnHidden = dotProduct(
+            this.rnnHiddenState,
+            this.rnnOutProjection
         );
+
+        const summed = elementwiseSum(rnnInp, rnnHidden);
+        const nonlinearity = summed.map(Math.tanh);
+
+        // update the hidden state for this "instrument"
+        this.rnnHiddenState = nonlinearity;
+
+        const output = dotProduct(nonlinearity, this.outProjection);
+        const withSin = output.map(Math.sin);
+
+        left.set(withSin);
+
+        // left.set(
+        //     new Float32Array(left.length).map((x) => Math.random() * 2 - 1)
+        // );
 
         return true;
     }

@@ -175,9 +175,6 @@ export class Instrument extends HTMLElement {
         const stop = shadow.getElementById('stop-demo');
         const container = shadow.querySelector('.instrument-container');
         const eventVectorContainer = shadow.querySelector('.current-event-vector');
-        const context = new AudioContext({
-            sampleRate: 22050,
-        });
         const rnnWeightsUrl = this.url;
         class ConvUnit {
             constructor(url) {
@@ -232,8 +229,13 @@ export class Instrument extends HTMLElement {
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
                     this.initialized = true;
+                    const context = new AudioContext({
+                        sampleRate: 22050,
+                    });
                     try {
-                        yield context.audioWorklet.addModule('/build/components/rnn.js');
+                        yield context.audioWorklet.addModule(
+                        // '/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.47/build/components/rnn.js');
                     }
                     catch (err) {
                         console.log(`Failed to add module due to ${err}`);
