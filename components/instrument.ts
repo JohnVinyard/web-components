@@ -270,7 +270,7 @@ export class Instrument extends HTMLElement {
         );
 
         const context = new AudioContext({
-            sampleRate: 22050,
+            // sampleRate: 22050,
         });
 
         const rnnWeightsUrl = this.url;
@@ -370,7 +370,7 @@ export class Instrument extends HTMLElement {
                     alert(`Failed to initialize instrument due to ${err}`);
                 }
 
-                container.classList.add('intialized');
+                container.classList.add('initialized');
             }
         }
 
