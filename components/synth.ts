@@ -6,8 +6,17 @@ enum SynthType {
 interface SamplerParams {
     type: SynthType.Sampler;
     url: string;
-    startSeconds: number;
-    durationSeconds: number;
+    startSeconds?: number;
+    durationSeconds?: number;
+    gain?: number;
+    filter?: {
+        centerFrequency: number;
+        bandwidth: number;
+    };
+    convolve?: {
+        url: string;
+        mix: number;
+    };
 }
 
 interface MusicalEvent {
@@ -24,7 +33,7 @@ interface SequencerParams {
 type Params = SamplerParams | SequencerParams;
 
 interface Synth<T extends Params> {
-    play(params: T): Promise<void>;
+    play(params: T, context: AudioContext): Promise<void>;
 }
 
 interface TriggeredEvent<T extends Params> {
@@ -32,6 +41,37 @@ interface TriggeredEvent<T extends Params> {
     event: T;
 }
 
+class AudioCache {
+    private readonly _cache: Record<string, Promise<AudioBuffer>> = {};
+
+    constructor() {}
+
+    async get(): Promise<AudioBuffer> {
+        throw new Error('');
+    }
+}
+
+/*
+const audioBuffer = await fetchAudio(url, context);
+    const source = context.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(context.destination);
+    source.start(0, start, duration);
+    return source;
+*/
+
+class Sampler implements Synth<SamplerParams> {
+    async play({
+        url,
+        startSeconds,
+        durationSeconds,
+        gain,
+        filter,
+        convolve,
+    }: SamplerParams): Promise<void> {
+        throw new Error('Method not implemented.');
+    }
+}
 const nestedExample: SequencerParams = {
     type: SynthType.Sequencer,
     events: [

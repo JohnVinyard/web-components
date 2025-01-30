@@ -197,6 +197,14 @@ export class Instrument extends HTMLElement {
                     }
                 });
             }
+            projectAcceleration(vec) {
+                if (!this.weights) {
+                    return zeros(64);
+                }
+                const proj = dotProduct(vec, this.weights);
+                const sparse = relu(proj);
+                return sparse;
+            }
             projectClick(clickPoint) {
                 if (!this.weights) {
                     return zeros(64);
@@ -230,6 +238,7 @@ export class Instrument extends HTMLElement {
                     try {
                         const weights = yield fetchRnnWeights(rnnWeightsUrl);
                         this.weights = twoDimArray(weights.controlPlaneMapping.array, [64, 2]);
+                        this.accelerometerWeights = twoDimArray(weights.accelerometerMapping.array, [64, 3]);
                         const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                             processorOptions: weights,
                         });
@@ -254,6 +263,14 @@ export class Instrument extends HTMLElement {
                     accum[url] = new ConvUnit(url);
                     return accum;
                 }, {});
+            }
+            projectAcceleration(vec) {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    return convUnit.projectAcceleration(vec);
+                }
+                return zeros(64);
             }
             projectClick(point) {
                 const key = notes['C'];
@@ -338,6 +355,19 @@ export class Instrument extends HTMLElement {
                         const norm = Math.sqrt(Math.pow(event.acceleration.x, 2) +
                             Math.pow(event.acceleration.y, 2) +
                             Math.pow(event.acceleration.z, 2));
+                        const accelerationVector = new Float32Array([
+                            event.acceleration.x,
+                            event.acceleration.y,
+                            event.acceleration.z,
+                        ]);
+                        const controlPlane = unit.projectAcceleration(accelerationVector);
+                        currentControlPlaneVector.set(controlPlane);
+                        eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
+                        // TODO: This is unused/unnecessary
+                        unit.triggerInstrument(controlPlane, {
+                            x: 0,
+                            y: 0,
+                        });
                         // unit.trigger(
                         //     Array.from(activeNotes).map((an) => notes[an]),
                         //     norm * 0.2
@@ -351,7 +381,7 @@ export class Instrument extends HTMLElement {
             }
         };
         start.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
-            // useAcc();
+            useAcc();
             console.log('BEGINNING MONITORIING');
             useMouse();
             // TODO: How do I get to the button element here?

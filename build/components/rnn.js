@@ -43,6 +43,7 @@ class Rnn extends AudioWorkletProcessor {
         this.rnnInProjection = twoDimArray(ctorArgs.rnnInProjection.array, ctorArgs.rnnInProjection.shape);
         this.rnnOutProjection = twoDimArray(ctorArgs.rnnOutProjection.array, ctorArgs.rnnOutProjection.shape);
         this.outProjection = twoDimArray(ctorArgs.outProjection.array, ctorArgs.outProjection.shape);
+        this.accelerometerMapping = twoDimArray(ctorArgs.accelerometerMapping.array, ctorArgs.accelerometerMapping.shape);
         this.port.onmessage = (event) => {
             this.eventQueue.push(event.data);
         };

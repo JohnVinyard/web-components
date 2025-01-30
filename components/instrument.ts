@@ -278,6 +278,7 @@ export class Instrument extends HTMLElement {
             // private filt: BiquadFilterNode | null = null;
             private instrument: AudioWorkletNode | null = null;
             private weights: Float32Array[] | null = null;
+            private accelerometerWeights: Float32Array[] | null;
 
             constructor(public readonly url: string) {
                 this.url = url;
@@ -291,6 +292,16 @@ export class Instrument extends HTMLElement {
                 if (this.instrument?.port) {
                     this.instrument.port.postMessage(arr);
                 }
+            }
+
+            public projectAcceleration(vec: Float32Array): Float32Array {
+                if (!this.weights) {
+                    return zeros(64);
+                }
+
+                const proj = dotProduct(vec, this.weights);
+                const sparse = relu(proj);
+                return sparse;
             }
 
             public projectClick(clickPoint: Float32Array): Float32Array {
@@ -336,6 +347,11 @@ export class Instrument extends HTMLElement {
                         [64, 2]
                     );
 
+                    this.accelerometerWeights = twoDimArray(
+                        weights.accelerometerMapping.array,
+                        [64, 3]
+                    );
+
                     const whiteNoise = new AudioWorkletNode(
                         context,
                         'rnn-instrument',
@@ -366,6 +382,16 @@ export class Instrument extends HTMLElement {
                     accum[url] = new ConvUnit(url);
                     return accum;
                 }, {});
+            }
+
+            public projectAcceleration(vec: Float32Array): Float32Array {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    return convUnit.projectAcceleration(vec);
+                }
+
+                return zeros(64);
             }
 
             public projectClick(point: Float32Array): Float32Array {
@@ -492,6 +518,24 @@ export class Instrument extends HTMLElement {
                                     event.acceleration.z ** 2
                             );
 
+                            const accelerationVector = new Float32Array([
+                                event.acceleration.x,
+                                event.acceleration.y,
+                                event.acceleration.z,
+                            ]);
+                            const controlPlane =
+                                unit.projectAcceleration(accelerationVector);
+                            currentControlPlaneVector.set(controlPlane);
+                            eventVectorContainer.innerHTML = renderVector(
+                                currentControlPlaneVector
+                            );
+
+                            // TODO: This is unused/unnecessary
+                            unit.triggerInstrument(controlPlane, {
+                                x: 0,
+                                y: 0,
+                            });
+
                             // unit.trigger(
                             //     Array.from(activeNotes).map((an) => notes[an]),
                             //     norm * 0.2
@@ -507,7 +551,7 @@ export class Instrument extends HTMLElement {
         };
 
         start.addEventListener('click', async (event) => {
-            // useAcc();
+            useAcc();
             console.log('BEGINNING MONITORIING');
 
             useMouse();

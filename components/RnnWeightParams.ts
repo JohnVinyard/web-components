@@ -3,4 +3,5 @@ export interface RnnWeightParams {
     out_projection: string;
     rnn_in_projection: string;
     rnn_out_projection: string;
+    accelerometer_mapping: string;
 }
