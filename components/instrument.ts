@@ -299,7 +299,7 @@ export class Instrument extends HTMLElement {
                     return zeros(64);
                 }
 
-                const proj = dotProduct(vec, this.weights);
+                const proj = dotProduct(vec, this.accelerometerWeights);
                 const sparse = relu(proj);
                 return sparse;
             }
@@ -338,6 +338,7 @@ export class Instrument extends HTMLElement {
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
+                    alert(`Failed to load module due to ${err}`);
                 }
 
                 try {
@@ -512,11 +513,11 @@ export class Instrument extends HTMLElement {
                             Math.abs(event.acceleration.y) > threshold ||
                             Math.abs(event.acceleration.z) > threshold
                         ) {
-                            const norm = Math.sqrt(
-                                event.acceleration.x ** 2 +
-                                    event.acceleration.y ** 2 +
-                                    event.acceleration.z ** 2
-                            );
+                            // const norm = Math.sqrt(
+                            //     event.acceleration.x ** 2 +
+                            //         event.acceleration.y ** 2 +
+                            //         event.acceleration.z ** 2
+                            // );
 
                             const accelerationVector = new Float32Array([
                                 event.acceleration.x,
@@ -551,7 +552,7 @@ export class Instrument extends HTMLElement {
         };
 
         start.addEventListener('click', async (event) => {
-            // useAcc();
+            useAcc();
             console.log('BEGINNING MONITORIING');
 
             useMouse();

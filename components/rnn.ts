@@ -64,7 +64,6 @@ class Rnn extends AudioWorkletProcessor {
     private readonly rnnInProjection: Float32Array[];
     private readonly rnnOutProjection: Float32Array[];
     private readonly outProjection: Float32Array[];
-    private readonly accelerometerMapping: Float32Array[];
 
     constructor(options: AudioWorkletNodeOptions) {
         super();
@@ -94,10 +93,6 @@ class Rnn extends AudioWorkletProcessor {
         this.outProjection = twoDimArray(
             ctorArgs.outProjection.array,
             ctorArgs.outProjection.shape
-        );
-        this.accelerometerMapping = twoDimArray(
-            ctorArgs.accelerometerMapping.array,
-            ctorArgs.accelerometerMapping.shape
         );
 
         this.port.onmessage = (event: MessageEvent<Float32Array>) => {
