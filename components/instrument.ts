@@ -551,7 +551,7 @@ export class Instrument extends HTMLElement {
         };
 
         start.addEventListener('click', async (event) => {
-            useAcc();
+            // useAcc();
             console.log('BEGINNING MONITORIING');
 
             useMouse();
