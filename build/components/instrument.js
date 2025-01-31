@@ -351,7 +351,7 @@ export class Instrument extends HTMLElement {
                 const position = new Float32Array([0, 0, 0]);
                 const velocity = new Float32Array([0, 0, 0]);
                 window.addEventListener('devicemotion', (event) => {
-                    const threshold = 5;
+                    const threshold = 4;
                     /**
                      * TODO:
                      *

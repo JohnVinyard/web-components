@@ -507,7 +507,7 @@ export class Instrument extends HTMLElement {
                 window.addEventListener(
                     'devicemotion',
                     (event) => {
-                        const threshold = 5;
+                        const threshold = 4;
 
                         /**
                          * TODO:
