@@ -351,7 +351,7 @@ export class Instrument extends HTMLElement {
                 const position = new Float32Array([0, 0, 0]);
                 const velocity = new Float32Array([0, 0, 0]);
                 window.addEventListener('devicemotion', (event) => {
-                    const threshold = 4;
+                    const threshold = 8;
                     const accelerationVector = new Float32Array([
                         event.acceleration.x,
                         event.acceleration.y,
@@ -378,7 +378,7 @@ export class Instrument extends HTMLElement {
                         //         event.acceleration.y ** 2 +
                         //         event.acceleration.z ** 2
                         // );
-                        const controlPlane = unit.projectAcceleration(newPos);
+                        const controlPlane = unit.projectAcceleration(accelerationVector);
                         currentControlPlaneVector.set(controlPlane);
                         eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
                         // TODO: This is unused/unnecessary
