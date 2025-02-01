@@ -337,7 +337,7 @@ export class Instrument extends HTMLElement {
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@latest/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.53/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
@@ -501,8 +501,8 @@ export class Instrument extends HTMLElement {
                 //     }
                 // );
 
-                const position = new Float32Array([0, 0, 0]);
-                const velocity = new Float32Array([0, 0, 0]);
+                // const position = new Float32Array([0, 0, 0]);
+                // const velocity = new Float32Array([0, 0, 0]);
 
                 window.addEventListener(
                     'devicemotion',
@@ -542,7 +542,7 @@ export class Instrument extends HTMLElement {
                                 currentControlPlaneVector
                             );
 
-                            // TODO: This is unused/unnecessary
+                            // TODO: The point argument is unused/unnecessary
                             unit.triggerInstrument(controlPlane, {
                                 x: 0,
                                 y: 0,
