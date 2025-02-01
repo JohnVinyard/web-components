@@ -96,7 +96,7 @@ export class AudioTimeline extends HTMLElement {
                 }
                 g:hover rect {
                     stroke: rgba(0, 0, 0, 0.2);
-                    stroke-width: 0.025;
+                    stroke-width: 0.01;
                 }
                 @media (max-width: 992px) {
                     .audio-timeline {

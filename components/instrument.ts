@@ -48,6 +48,14 @@ export const sin2d = (arr: Float32Array[]): Float32Array[] => {
     return arr.map(sin);
 };
 
+const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
+    return a.map((value, index) => value + b[index]);
+};
+
+const multiply = (a: Float32Array, b: number): Float32Array => {
+    return a.map((value, index) => value * b);
+};
+
 const twoDimArray = (
     data: Float32Array,
     shape: [number, number]
@@ -337,7 +345,7 @@ export class Instrument extends HTMLElement {
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.53/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.54/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
@@ -383,6 +391,9 @@ export class Instrument extends HTMLElement {
 
         class Controller {
             private readonly units: Record<string, ConvUnit>;
+
+            public readonly velocity: Float32Array = zeros(3);
+            public readonly position: Float32Array = zeros(3);
 
             constructor(urls: string[]) {
                 this.units = urls.reduce((accum, url) => {
@@ -509,6 +520,25 @@ export class Instrument extends HTMLElement {
                     (event) => {
                         const threshold = 4;
 
+                        const accelerationVector = new Float32Array([
+                            event.acceleration.x,
+                            event.acceleration.y,
+                            event.acceleration.z,
+                        ]);
+
+                        // update velocity with acceleration
+                        unit.velocity.set(
+                            elementwiseSum(unit.velocity, accelerationVector)
+                        );
+
+                        // update position with velocity
+                        unit.position.set(
+                            elementwiseSum(unit.position, unit.velocity)
+                        );
+
+                        // decay velocity
+                        unit.velocity.set(multiply(unit.velocity, 0.9));
+
                         /**
                          * TODO:
                          *
@@ -528,14 +558,15 @@ export class Instrument extends HTMLElement {
                             //         event.acceleration.z ** 2
                             // );
 
-                            const accelerationVector = new Float32Array([
-                                event.acceleration.x,
-                                event.acceleration.y,
-                                event.acceleration.z,
-                            ]);
+                            // const accelerationVector = new Float32Array([
+                            //     event.acceleration.x,
+                            //     event.acceleration.y,
+                            //     event.acceleration.z,
+                            // ]);
+                            const positionVector = unit.position;
 
                             const controlPlane =
-                                unit.projectAcceleration(accelerationVector);
+                                unit.projectAcceleration(positionVector);
 
                             currentControlPlaneVector.set(controlPlane);
                             eventVectorContainer.innerHTML = renderVector(
