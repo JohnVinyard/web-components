@@ -16,9 +16,16 @@ class AudioCache {
     constructor() {
         this._cache = {};
     }
-    get() {
+    get(url, context) {
         return __awaiter(this, void 0, void 0, function* () {
-            throw new Error('');
+            if (this._cache[url] !== undefined) {
+                return this._cache[url];
+            }
+            const resp = yield fetch(url);
+            const buffer = yield resp.arrayBuffer();
+            const audio = context.decodeAudioData(buffer);
+            this._cache[url] = audio;
+            return audio;
         });
     }
 }
@@ -31,9 +38,15 @@ const audioBuffer = await fetchAudio(url, context);
     return source;
 */
 class Sampler {
-    play({ url, startSeconds, durationSeconds, gain, filter, convolve, }) {
+    constructor() {
+        this.version = '0.0.1';
+        this.cache = new AudioCache();
+    }
+    play({ url, startSeconds, durationSeconds, gain, filter, convolve, }, context) {
         return __awaiter(this, void 0, void 0, function* () {
-            throw new Error('Method not implemented.');
+            const buffer = yield this.cache.get(url, context);
+            const source = context.createBufferSource();
+            source.buffer = buffer;
         });
     }
 }

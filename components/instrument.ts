@@ -345,7 +345,7 @@ export class Instrument extends HTMLElement {
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.54/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.55/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
@@ -391,9 +391,7 @@ export class Instrument extends HTMLElement {
 
         class Controller {
             private readonly units: Record<string, ConvUnit>;
-
-            public readonly velocity: Float32Array = zeros(3);
-            public readonly position: Float32Array = zeros(3);
+            public threshold: number = 4;
 
             constructor(urls: string[]) {
                 this.units = urls.reduce((accum, url) => {
@@ -512,33 +510,9 @@ export class Instrument extends HTMLElement {
                 //     }
                 // );
 
-                // const position = new Float32Array([0, 0, 0]);
-                // const velocity = new Float32Array([0, 0, 0]);
-
                 window.addEventListener(
                     'devicemotion',
                     (event) => {
-                        const threshold = 4;
-
-                        const accelerationVector = new Float32Array([
-                            event.acceleration.x,
-                            event.acceleration.y,
-                            event.acceleration.z,
-                        ]);
-
-                        // update velocity with acceleration
-                        unit.velocity.set(
-                            elementwiseSum(unit.velocity, accelerationVector)
-                        );
-
-                        // update position with velocity
-                        unit.position.set(
-                            elementwiseSum(unit.position, unit.velocity)
-                        );
-
-                        // decay velocity
-                        unit.velocity.set(multiply(unit.velocity, 0.9));
-
                         /**
                          * TODO:
                          *
@@ -546,11 +520,14 @@ export class Instrument extends HTMLElement {
                          * - project the 3D acceleration vector
                          */
 
+                        // threshold falls linearly, with a floor of 4
+                        unit.threshold = Math.min(4, unit.threshold - 0.25);
+
                         // TODO: maybe this trigger condition should be the norm as well?
                         if (
-                            Math.abs(event.acceleration.x) > threshold ||
-                            Math.abs(event.acceleration.y) > threshold ||
-                            Math.abs(event.acceleration.z) > threshold
+                            Math.abs(event.acceleration.x) > unit.threshold ||
+                            Math.abs(event.acceleration.y) > unit.threshold ||
+                            Math.abs(event.acceleration.z) > unit.threshold
                         ) {
                             // const norm = Math.sqrt(
                             //     event.acceleration.x ** 2 +
@@ -558,15 +535,18 @@ export class Instrument extends HTMLElement {
                             //         event.acceleration.z ** 2
                             // );
 
-                            // const accelerationVector = new Float32Array([
-                            //     event.acceleration.x,
-                            //     event.acceleration.y,
-                            //     event.acceleration.z,
-                            // ]);
-                            const positionVector = unit.position;
+                            // unit threshold goes up when triggered, like a refractory
+                            // period
+                            unit.threshold = 10;
+
+                            const accelerationVector = new Float32Array([
+                                event.acceleration.x,
+                                event.acceleration.y,
+                                event.acceleration.z,
+                            ]);
 
                             const controlPlane =
-                                unit.projectAcceleration(positionVector);
+                                unit.projectAcceleration(accelerationVector);
 
                             currentControlPlaneVector.set(controlPlane);
                             eventVectorContainer.innerHTML = renderVector(

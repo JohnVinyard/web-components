@@ -241,7 +241,7 @@ export class Instrument extends HTMLElement {
                     try {
                         yield context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.54/build/components/rnn.js');
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.55/build/components/rnn.js');
                     }
                     catch (err) {
                         console.log(`Failed to add module due to ${err}`);
@@ -273,8 +273,7 @@ export class Instrument extends HTMLElement {
         };
         class Controller {
             constructor(urls) {
-                this.velocity = zeros(3);
-                this.position = zeros(3);
+                this.threshold = 4;
                 this.units = urls.reduce((accum, url) => {
                     accum[url] = new ConvUnit(url);
                     return accum;
@@ -356,43 +355,33 @@ export class Instrument extends HTMLElement {
                 //         // unit.updateCutoff(hz);
                 //     }
                 // );
-                // const position = new Float32Array([0, 0, 0]);
-                // const velocity = new Float32Array([0, 0, 0]);
                 window.addEventListener('devicemotion', (event) => {
-                    const threshold = 4;
-                    const accelerationVector = new Float32Array([
-                        event.acceleration.x,
-                        event.acceleration.y,
-                        event.acceleration.z,
-                    ]);
-                    // update velocity with acceleration
-                    unit.velocity.set(elementwiseSum(unit.velocity, accelerationVector));
-                    // update position with velocity
-                    unit.position.set(elementwiseSum(unit.position, unit.velocity));
-                    // decay velocity
-                    unit.velocity.set(multiply(unit.velocity, 0.9));
                     /**
                      * TODO:
                      *
                      * - settable thresholds for spacing in time as well as norm of motion
                      * - project the 3D acceleration vector
                      */
+                    // threshold falls linearly, with a floor of 4
+                    unit.threshold = Math.min(4, unit.threshold - 0.25);
                     // TODO: maybe this trigger condition should be the norm as well?
-                    if (Math.abs(event.acceleration.x) > threshold ||
-                        Math.abs(event.acceleration.y) > threshold ||
-                        Math.abs(event.acceleration.z) > threshold) {
+                    if (Math.abs(event.acceleration.x) > unit.threshold ||
+                        Math.abs(event.acceleration.y) > unit.threshold ||
+                        Math.abs(event.acceleration.z) > unit.threshold) {
                         // const norm = Math.sqrt(
                         //     event.acceleration.x ** 2 +
                         //         event.acceleration.y ** 2 +
                         //         event.acceleration.z ** 2
                         // );
-                        // const accelerationVector = new Float32Array([
-                        //     event.acceleration.x,
-                        //     event.acceleration.y,
-                        //     event.acceleration.z,
-                        // ]);
-                        const positionVector = unit.position;
-                        const controlPlane = unit.projectAcceleration(positionVector);
+                        // unit threshold goes up when triggered, like a refractory
+                        // period
+                        unit.threshold = 10;
+                        const accelerationVector = new Float32Array([
+                            event.acceleration.x,
+                            event.acceleration.y,
+                            event.acceleration.z,
+                        ]);
+                        const controlPlane = unit.projectAcceleration(accelerationVector);
                         currentControlPlaneVector.set(controlPlane);
                         eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
                         // TODO: The point argument is unused/unnecessary

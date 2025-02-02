@@ -33,6 +33,8 @@ interface SequencerParams {
 type Params = SamplerParams | SequencerParams;
 
 interface Synth<T extends Params> {
+    version: string;
+
     play(params: T, context: AudioContext): Promise<void>;
 }
 
@@ -46,8 +48,16 @@ class AudioCache {
 
     constructor() {}
 
-    async get(): Promise<AudioBuffer> {
-        throw new Error('');
+    async get(url: string, context: AudioContext): Promise<AudioBuffer> {
+        if (this._cache[url] !== undefined) {
+            return this._cache[url];
+        }
+
+        const resp = await fetch(url);
+        const buffer = await resp.arrayBuffer();
+        const audio = context.decodeAudioData(buffer);
+        this._cache[url] = audio;
+        return audio;
     }
 }
 
@@ -61,15 +71,28 @@ const audioBuffer = await fetchAudio(url, context);
 */
 
 class Sampler implements Synth<SamplerParams> {
-    async play({
-        url,
-        startSeconds,
-        durationSeconds,
-        gain,
-        filter,
-        convolve,
-    }: SamplerParams): Promise<void> {
-        throw new Error('Method not implemented.');
+    private readonly cache: AudioCache;
+    version: string = '0.0.1';
+
+    constructor() {
+        this.cache = new AudioCache();
+    }
+
+    async play(
+        {
+            url,
+            startSeconds,
+            durationSeconds,
+            gain,
+            filter,
+            convolve,
+        }: SamplerParams,
+        context: AudioContext
+    ): Promise<void> {
+        const buffer = await this.cache.get(url, context);
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        
     }
 }
 const nestedExample: SequencerParams = {
