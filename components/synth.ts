@@ -3,9 +3,20 @@ enum SynthType {
     Sequencer = 'sequencer',
 }
 
+interface GainKeyPoint {
+    time: number;
+    gain: number;
+}
+
+interface EnvelopeParams {
+    gain: GainKeyPoint[];
+    type: 'linear' | 'exponential';
+}
+
 interface SamplerParams {
     type: SynthType.Sampler;
     url: string;
+    envelope?: EnvelopeParams;
     startSeconds?: number;
     durationSeconds?: number;
     gain?: number;
@@ -92,7 +103,6 @@ class Sampler implements Synth<SamplerParams> {
         const buffer = await this.cache.get(url, context);
         const source = context.createBufferSource();
         source.buffer = buffer;
-        
     }
 }
 const nestedExample: SequencerParams = {
