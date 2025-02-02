@@ -345,7 +345,7 @@ export class Instrument extends HTMLElement {
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.55/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.56/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
@@ -391,7 +391,6 @@ export class Instrument extends HTMLElement {
 
         class Controller {
             private readonly units: Record<string, ConvUnit>;
-            public threshold: number = 4;
 
             constructor(urls: string[]) {
                 this.units = urls.reduce((accum, url) => {
@@ -513,6 +512,7 @@ export class Instrument extends HTMLElement {
                 window.addEventListener(
                     'devicemotion',
                     (event) => {
+                        const threshold: number = 6;
                         /**
                          * TODO:
                          *
@@ -521,13 +521,12 @@ export class Instrument extends HTMLElement {
                          */
 
                         // threshold falls linearly, with a floor of 4
-                        unit.threshold = Math.min(4, unit.threshold - 0.25);
 
                         // TODO: maybe this trigger condition should be the norm as well?
                         if (
-                            Math.abs(event.acceleration.x) > unit.threshold ||
-                            Math.abs(event.acceleration.y) > unit.threshold ||
-                            Math.abs(event.acceleration.z) > unit.threshold
+                            Math.abs(event.acceleration.x) > threshold ||
+                            Math.abs(event.acceleration.y) > threshold ||
+                            Math.abs(event.acceleration.z) > threshold
                         ) {
                             // const norm = Math.sqrt(
                             //     event.acceleration.x ** 2 +
@@ -537,7 +536,6 @@ export class Instrument extends HTMLElement {
 
                             // unit threshold goes up when triggered, like a refractory
                             // period
-                            unit.threshold = 10;
 
                             const accelerationVector = new Float32Array([
                                 event.acceleration.x,
