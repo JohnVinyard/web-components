@@ -5,5 +5,7 @@ import { CodeBlock } from './codeblock';
 import { CitationBlock } from './citation';
 import { AudioTimeline } from './audiotimeline';
 import { Instrument } from './instrument';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, };
+import { Sampler } from './synth';
+import { SamplerTest } from './samplertest';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, };
 //# sourceMappingURL=index.js.map

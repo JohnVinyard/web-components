@@ -5,6 +5,8 @@ import { CodeBlock } from './codeblock';
 import { CitationBlock } from './citation';
 import { AudioTimeline } from './audiotimeline';
 import { Instrument } from './instrument';
+import { Sampler } from './synth';
+import { SamplerTest } from './samplertest';
 
 export {
     AudioView,
@@ -14,4 +16,6 @@ export {
     CitationBlock,
     AudioTimeline,
     Instrument,
+    Sampler,
+    SamplerTest,
 };

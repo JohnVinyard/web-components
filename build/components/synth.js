@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var SynthType;
+export var SynthType;
 (function (SynthType) {
     SynthType["Sampler"] = "sampler";
     SynthType["Sequencer"] = "sequencer";
@@ -37,8 +37,9 @@ const audioBuffer = await fetchAudio(url, context);
     source.start(0, start, duration);
     return source;
 */
-class Sampler {
-    constructor() {
+export class Sampler {
+    constructor(latencyBufferSeconds = 0.01) {
+        this.latencyBufferSeconds = latencyBufferSeconds;
         this.version = '0.0.1';
         this.cache = new AudioCache();
     }
@@ -47,51 +48,66 @@ class Sampler {
             const buffer = yield this.cache.get(url, context);
             const source = context.createBufferSource();
             source.buffer = buffer;
+            source.channelCount = 1;
+            if (convolve) {
+                const verb = context.createConvolver();
+                console.log(`Fetching ${convolve.url}`);
+                const verbBuffer = yield this.cache.get(convolve.url, context);
+                verb.buffer = verbBuffer;
+                verb.normalize = true;
+                verb.channelCount = 1;
+                source.connect(verb);
+                verb.connect(context.destination);
+            }
+            else {
+                source.connect(context.destination);
+            }
+            source.start(context.currentTime + this.latencyBufferSeconds, startSeconds, durationSeconds);
         });
     }
 }
-const nestedExample = {
-    type: SynthType.Sequencer,
-    events: [
-        {
-            type: SynthType.Sampler,
-            timeSeconds: 1,
-            params: {
-                type: SynthType.Sampler,
-                url: '',
-                startSeconds: 1,
-                durationSeconds: 10,
-            },
-        },
-        {
-            type: SynthType.Sequencer,
-            timeSeconds: 5,
-            params: {
-                type: SynthType.Sequencer,
-                events: [
-                    {
-                        type: SynthType.Sampler,
-                        timeSeconds: 1,
-                        params: {
-                            type: SynthType.Sampler,
-                            url: '',
-                            startSeconds: 1,
-                            durationSeconds: 10,
-                        },
-                    },
-                    {
-                        type: SynthType.Sampler,
-                        timeSeconds: 2,
-                        params: {
-                            type: SynthType.Sampler,
-                            url: '',
-                            startSeconds: 1,
-                            durationSeconds: 10,
-                        },
-                    },
-                ],
-            },
-        },
-    ],
-};
+// const nestedExample: SequencerParams = {
+//     type: SynthType.Sequencer,
+//     events: [
+//         {
+//             type: SynthType.Sampler,
+//             timeSeconds: 1,
+//             params: {
+//                 type: SynthType.Sampler,
+//                 url: '',
+//                 startSeconds: 1,
+//                 durationSeconds: 10,
+//             },
+//         },
+//         {
+//             type: SynthType.Sequencer,
+//             timeSeconds: 5,
+//             params: {
+//                 type: SynthType.Sequencer,
+//                 events: [
+//                     {
+//                         type: SynthType.Sampler,
+//                         timeSeconds: 1,
+//                         params: {
+//                             type: SynthType.Sampler,
+//                             url: '',
+//                             startSeconds: 1,
+//                             durationSeconds: 10,
+//                         },
+//                     },
+//                     {
+//                         type: SynthType.Sampler,
+//                         timeSeconds: 2,
+//                         params: {
+//                             type: SynthType.Sampler,
+//                             url: '',
+//                             startSeconds: 1,
+//                             durationSeconds: 10,
+//                         },
+//                     },
+//                 ],
+//             },
+//         },
+//     ],
+// };
 //# sourceMappingURL=synth.js.map
