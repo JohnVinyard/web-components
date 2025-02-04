@@ -21,11 +21,19 @@ class AudioCache {
             if (this._cache[url] !== undefined) {
                 return this._cache[url];
             }
-            const resp = yield fetch(url);
-            const buffer = yield resp.arrayBuffer();
-            const audio = context.decodeAudioData(buffer);
-            this._cache[url] = audio;
-            return audio;
+            const pr = fetch(url)
+                .then((resp) => resp.arrayBuffer())
+                .then((x) => {
+                const audio = context.decodeAudioData(x);
+                return audio;
+            });
+            this._cache[url] = pr;
+            return pr;
+            // const resp = await fetch(url);
+            // const buffer = await resp.arrayBuffer();
+            // const audio = context.decodeAudioData(buffer);
+            // this._cache[url] = audio;
+            // return audio;
         });
     }
 }
@@ -37,13 +45,35 @@ const audioBuffer = await fetchAudio(url, context);
     source.start(0, start, duration);
     return source;
 */
+export class Sequencer {
+    constructor(latencyBufferSeconds = 0.01) {
+        this.latencyBufferSeconds = latencyBufferSeconds;
+        this.version = '0.0.1';
+        this.sampler = new Sampler(latencyBufferSeconds);
+    }
+    play({ events }, context, time) {
+        return __awaiter(this, void 0, void 0, function* () {
+            for (const event of events) {
+                if (event.type === SynthType.Sampler) {
+                    this.sampler.play(event.params, context, time + event.timeSeconds);
+                }
+                else if (event.type === SynthType.Sequencer) {
+                    this.play(event.params, context, time + event.timeSeconds);
+                }
+                else {
+                    throw new Error('Unsupported');
+                }
+            }
+        });
+    }
+}
 export class Sampler {
     constructor(latencyBufferSeconds = 0.01) {
         this.latencyBufferSeconds = latencyBufferSeconds;
         this.version = '0.0.1';
         this.cache = new AudioCache();
     }
-    play({ url, startSeconds, durationSeconds, gain, filter, convolve, }, context) {
+    play({ url, startSeconds, durationSeconds, gain, filter, convolve, }, context, time) {
         return __awaiter(this, void 0, void 0, function* () {
             const buffer = yield this.cache.get(url, context);
             const source = context.createBufferSource();
@@ -62,7 +92,7 @@ export class Sampler {
             else {
                 source.connect(context.destination);
             }
-            source.start(context.currentTime + this.latencyBufferSeconds, startSeconds, durationSeconds);
+            source.start(context.currentTime + this.latencyBufferSeconds + time, startSeconds, durationSeconds);
         });
     }
 }

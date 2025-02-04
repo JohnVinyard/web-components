@@ -39,7 +39,7 @@ interface MusicalEvent {
     params: Params;
 }
 
-interface SequencerParams {
+export interface SequencerParams {
     type: SynthType.Sequencer;
     events: MusicalEvent[];
 }
@@ -68,22 +68,50 @@ class AudioCache {
             return this._cache[url];
         }
 
-        const resp = await fetch(url);
-        const buffer = await resp.arrayBuffer();
-        const audio = context.decodeAudioData(buffer);
-        this._cache[url] = audio;
-        return audio;
+        const pr = fetch(url)
+            .then((resp) => resp.arrayBuffer())
+            .then((x) => {
+                const audio = context.decodeAudioData(x);
+                return audio;
+            });
+
+        this._cache[url] = pr;
+        return pr;
     }
 }
 
-/*
-const audioBuffer = await fetchAudio(url, context);
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    source.start(0, start, duration);
-    return source;
-*/
+export class Sequencer implements Synth<SequencerParams> {
+    version: string = '0.0.1';
+    private readonly sampler: Sampler;
+
+    constructor(public readonly latencyBufferSeconds: number = 0.01) {
+        this.sampler = new Sampler(latencyBufferSeconds);
+    }
+
+    async play(
+        { events }: SequencerParams,
+        context: AudioContext,
+        time: number
+    ): Promise<void> {
+        for (const event of events) {
+            if (event.type === SynthType.Sampler) {
+                this.sampler.play(
+                    event.params as SamplerParams,
+                    context,
+                    time + event.timeSeconds
+                );
+            } else if (event.type === SynthType.Sequencer) {
+                this.play(
+                    event.params as SequencerParams,
+                    context,
+                    time + event.timeSeconds
+                );
+            } else {
+                throw new Error('Unsupported');
+            }
+        }
+    }
+}
 
 export class Sampler implements Synth<SamplerParams> {
     private readonly cache: AudioCache;
@@ -102,7 +130,8 @@ export class Sampler implements Synth<SamplerParams> {
             filter,
             convolve,
         }: SamplerParams,
-        context: AudioContext
+        context: AudioContext,
+        time: number
     ): Promise<void> {
         const buffer = await this.cache.get(url, context);
         const source = context.createBufferSource();
@@ -123,54 +152,9 @@ export class Sampler implements Synth<SamplerParams> {
         }
 
         source.start(
-            context.currentTime + this.latencyBufferSeconds,
+            context.currentTime + this.latencyBufferSeconds + time,
             startSeconds,
             durationSeconds
         );
     }
 }
-
-// const nestedExample: SequencerParams = {
-//     type: SynthType.Sequencer,
-//     events: [
-//         {
-//             type: SynthType.Sampler,
-//             timeSeconds: 1,
-//             params: {
-//                 type: SynthType.Sampler,
-//                 url: '',
-//                 startSeconds: 1,
-//                 durationSeconds: 10,
-//             },
-//         },
-//         {
-//             type: SynthType.Sequencer,
-//             timeSeconds: 5,
-//             params: {
-//                 type: SynthType.Sequencer,
-//                 events: [
-//                     {
-//                         type: SynthType.Sampler,
-//                         timeSeconds: 1,
-//                         params: {
-//                             type: SynthType.Sampler,
-//                             url: '',
-//                             startSeconds: 1,
-//                             durationSeconds: 10,
-//                         },
-//                     },
-//                     {
-//                         type: SynthType.Sampler,
-//                         timeSeconds: 2,
-//                         params: {
-//                             type: SynthType.Sampler,
-//                             url: '',
-//                             startSeconds: 1,
-//                             durationSeconds: 10,
-//                         },
-//                     },
-//                 ],
-//             },
-//         },
-//     ],
-// };

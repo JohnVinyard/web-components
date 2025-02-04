@@ -1,4 +1,10 @@
-import { Sampler, SamplerParams, SynthType } from './synth';
+import {
+    Sampler,
+    SamplerParams,
+    Sequencer,
+    SequencerParams,
+    SynthType,
+} from './synth';
 
 export class SamplerTest extends HTMLElement {
     public url: string | null;
@@ -33,30 +39,71 @@ export class SamplerTest extends HTMLElement {
         <div id="play-sampler">
         </div>`;
 
-        //
+        // https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav
 
-        const sampler = new Sampler(0.01);
+        const sequencer = new Sequencer(0.01);
 
         const button = shadow.getElementById('play-sampler');
         button.addEventListener('click', async () => {
             const context = new AudioContext({});
-
             const params: SamplerParams = {
                 type: SynthType.Sampler,
-                url: this.url ?? '',
-                startSeconds: this.start ? parseFloat(this.start) : 0,
-                durationSeconds: this.duration
-                    ? parseFloat(this.duration)
-                    : undefined,
-                convolve: this.conv
-                    ? {
-                          url: this.conv,
-                          mix: 0.5,
-                      }
-                    : undefined,
+                url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
             };
-            console.log(params);
-            sampler.play(params, context);
+
+            const seq: SequencerParams = {
+                type: SynthType.Sequencer,
+                events: [
+                    {
+                        timeSeconds: 0,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.25,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.5,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.75,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                ],
+            };
+
+            const topLevel: SequencerParams = {
+                type: SynthType.Sequencer,
+                events: [
+                    {
+                        timeSeconds: 0,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 1,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 2,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 3,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                ],
+            };
+
+            sequencer.play(topLevel, context, 0);
         });
     }
 

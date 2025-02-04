@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { Sampler, SynthType } from './synth';
+import { Sequencer, SynthType, } from './synth';
 export class SamplerTest extends HTMLElement {
     constructor() {
         super();
@@ -32,28 +32,83 @@ export class SamplerTest extends HTMLElement {
         </style>
         <div id="play-sampler">
         </div>`;
-        //
-        const sampler = new Sampler(0.01);
+        // https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav
+        // const sampler = new Sampler(0.01);
+        const sequencer = new Sequencer(0.01);
         const button = shadow.getElementById('play-sampler');
         button.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-            var _a;
             const context = new AudioContext({});
             const params = {
                 type: SynthType.Sampler,
-                url: (_a = this.url) !== null && _a !== void 0 ? _a : '',
-                startSeconds: this.start ? parseFloat(this.start) : 0,
-                durationSeconds: this.duration
-                    ? parseFloat(this.duration)
-                    : undefined,
-                convolve: this.conv
-                    ? {
-                        url: this.conv,
-                        mix: 0.5,
-                    }
-                    : undefined,
+                url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
             };
-            console.log(params);
-            sampler.play(params, context);
+            const seq = {
+                type: SynthType.Sequencer,
+                events: [
+                    {
+                        timeSeconds: 0,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.25,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.5,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                    {
+                        timeSeconds: 0.75,
+                        params,
+                        type: SynthType.Sampler,
+                    },
+                ],
+            };
+            const topLevel = {
+                type: SynthType.Sequencer,
+                events: [
+                    {
+                        timeSeconds: 0,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 1,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 2,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                    {
+                        timeSeconds: 3,
+                        params: seq,
+                        type: SynthType.Sequencer,
+                    },
+                ],
+            };
+            sequencer.play(topLevel, context, 0);
+            // const params: SamplerParams = {
+            //     type: SynthType.Sampler,
+            //     url: this.url ?? '',
+            //     startSeconds: this.start ? parseFloat(this.start) : 0,
+            //     durationSeconds: this.duration
+            //         ? parseFloat(this.duration)
+            //         : undefined,
+            //     convolve: this.conv
+            //         ? {
+            //               url: this.conv,
+            //               mix: 0.5,
+            //           }
+            //         : undefined,
+            // };
+            // console.log(params);
+            // sampler.play(params, context, 0);
         }));
     }
     connectedCallback() {
