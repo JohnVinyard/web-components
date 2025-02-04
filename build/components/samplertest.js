@@ -33,7 +33,6 @@ export class SamplerTest extends HTMLElement {
         <div id="play-sampler">
         </div>`;
         // https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav
-        // const sampler = new Sampler(0.01);
         const sequencer = new Sequencer(0.01);
         const button = shadow.getElementById('play-sampler');
         button.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
@@ -41,9 +40,23 @@ export class SamplerTest extends HTMLElement {
             const params = {
                 type: SynthType.Sampler,
                 url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
+                convolve: {
+                    url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                    mix: 0.5
+                }
             };
+            const snare = {
+                type: SynthType.Sampler,
+                url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1snare.wav',
+                convolve: {
+                    url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                    mix: 0.5
+                }
+            };
+            const speed = 2;
             const seq = {
                 type: SynthType.Sequencer,
+                speed,
                 events: [
                     {
                         timeSeconds: 0,
@@ -56,6 +69,11 @@ export class SamplerTest extends HTMLElement {
                         type: SynthType.Sampler,
                     },
                     {
+                        timeSeconds: 0.25,
+                        params: snare,
+                        type: SynthType.Sampler,
+                    },
+                    {
                         timeSeconds: 0.5,
                         params,
                         type: SynthType.Sampler,
@@ -65,10 +83,16 @@ export class SamplerTest extends HTMLElement {
                         params,
                         type: SynthType.Sampler,
                     },
+                    {
+                        timeSeconds: 0.75,
+                        params: snare,
+                        type: SynthType.Sampler,
+                    },
                 ],
             };
             const topLevel = {
                 type: SynthType.Sequencer,
+                speed,
                 events: [
                     {
                         timeSeconds: 0,
@@ -93,22 +117,6 @@ export class SamplerTest extends HTMLElement {
                 ],
             };
             sequencer.play(topLevel, context, 0);
-            // const params: SamplerParams = {
-            //     type: SynthType.Sampler,
-            //     url: this.url ?? '',
-            //     startSeconds: this.start ? parseFloat(this.start) : 0,
-            //     durationSeconds: this.duration
-            //         ? parseFloat(this.duration)
-            //         : undefined,
-            //     convolve: this.conv
-            //         ? {
-            //               url: this.conv,
-            //               mix: 0.5,
-            //           }
-            //         : undefined,
-            // };
-            // console.log(params);
-            // sampler.play(params, context, 0);
         }));
     }
     connectedCallback() {

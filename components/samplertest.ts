@@ -49,10 +49,26 @@ export class SamplerTest extends HTMLElement {
             const params: SamplerParams = {
                 type: SynthType.Sampler,
                 url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
+                convolve: {
+                    url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                    mix: 0.5
+                }
             };
+
+            const snare: SamplerParams = {
+                type: SynthType.Sampler,
+                url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1snare.wav',
+                convolve: {
+                    url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                    mix: 0.5
+                }
+            };
+
+            const speed: number = 2;
 
             const seq: SequencerParams = {
                 type: SynthType.Sequencer,
+                speed,
                 events: [
                     {
                         timeSeconds: 0,
@@ -65,6 +81,11 @@ export class SamplerTest extends HTMLElement {
                         type: SynthType.Sampler,
                     },
                     {
+                        timeSeconds: 0.25,
+                        params: snare,
+                        type: SynthType.Sampler,
+                    },
+                    {
                         timeSeconds: 0.5,
                         params,
                         type: SynthType.Sampler,
@@ -74,11 +95,17 @@ export class SamplerTest extends HTMLElement {
                         params,
                         type: SynthType.Sampler,
                     },
+                    {
+                        timeSeconds: 0.75,
+                        params: snare,
+                        type: SynthType.Sampler,
+                    },
                 ],
             };
 
             const topLevel: SequencerParams = {
                 type: SynthType.Sequencer,
+                speed,
                 events: [
                     {
                         timeSeconds: 0,

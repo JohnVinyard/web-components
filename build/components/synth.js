@@ -29,36 +29,25 @@ class AudioCache {
             });
             this._cache[url] = pr;
             return pr;
-            // const resp = await fetch(url);
-            // const buffer = await resp.arrayBuffer();
-            // const audio = context.decodeAudioData(buffer);
-            // this._cache[url] = audio;
-            // return audio;
         });
     }
 }
-/*
-const audioBuffer = await fetchAudio(url, context);
-    const source = context.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(context.destination);
-    source.start(0, start, duration);
-    return source;
-*/
 export class Sequencer {
     constructor(latencyBufferSeconds = 0.01) {
         this.latencyBufferSeconds = latencyBufferSeconds;
         this.version = '0.0.1';
         this.sampler = new Sampler(latencyBufferSeconds);
     }
-    play({ events }, context, time) {
+    play({ events, speed }, context, time) {
         return __awaiter(this, void 0, void 0, function* () {
             for (const event of events) {
                 if (event.type === SynthType.Sampler) {
-                    this.sampler.play(event.params, context, time + event.timeSeconds);
+                    this.sampler.play(event.params, context, time + event.timeSeconds * speed);
                 }
                 else if (event.type === SynthType.Sequencer) {
-                    this.play(event.params, context, time + event.timeSeconds);
+                    this.play(event.params, context, time +
+                        event.timeSeconds *
+                            event.params.speed);
                 }
                 else {
                     throw new Error('Unsupported');
@@ -96,48 +85,4 @@ export class Sampler {
         });
     }
 }
-// const nestedExample: SequencerParams = {
-//     type: SynthType.Sequencer,
-//     events: [
-//         {
-//             type: SynthType.Sampler,
-//             timeSeconds: 1,
-//             params: {
-//                 type: SynthType.Sampler,
-//                 url: '',
-//                 startSeconds: 1,
-//                 durationSeconds: 10,
-//             },
-//         },
-//         {
-//             type: SynthType.Sequencer,
-//             timeSeconds: 5,
-//             params: {
-//                 type: SynthType.Sequencer,
-//                 events: [
-//                     {
-//                         type: SynthType.Sampler,
-//                         timeSeconds: 1,
-//                         params: {
-//                             type: SynthType.Sampler,
-//                             url: '',
-//                             startSeconds: 1,
-//                             durationSeconds: 10,
-//                         },
-//                     },
-//                     {
-//                         type: SynthType.Sampler,
-//                         timeSeconds: 2,
-//                         params: {
-//                             type: SynthType.Sampler,
-//                             url: '',
-//                             startSeconds: 1,
-//                             durationSeconds: 10,
-//                         },
-//                     },
-//                 ],
-//             },
-//         },
-//     ],
-// };
 //# sourceMappingURL=synth.js.map

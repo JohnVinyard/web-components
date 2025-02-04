@@ -42,6 +42,7 @@ interface MusicalEvent {
 export interface SequencerParams {
     type: SynthType.Sequencer;
     events: MusicalEvent[];
+    speed: number;
 }
 
 type Params = SamplerParams | SequencerParams;
@@ -89,7 +90,7 @@ export class Sequencer implements Synth<SequencerParams> {
     }
 
     async play(
-        { events }: SequencerParams,
+        { events, speed }: SequencerParams,
         context: AudioContext,
         time: number
     ): Promise<void> {
@@ -98,13 +99,15 @@ export class Sequencer implements Synth<SequencerParams> {
                 this.sampler.play(
                     event.params as SamplerParams,
                     context,
-                    time + event.timeSeconds
+                    time + event.timeSeconds * speed
                 );
             } else if (event.type === SynthType.Sequencer) {
                 this.play(
                     event.params as SequencerParams,
                     context,
-                    time + event.timeSeconds
+                    time +
+                        event.timeSeconds *
+                            (event.params as SequencerParams).speed
                 );
             } else {
                 throw new Error('Unsupported');
