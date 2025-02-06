@@ -51,7 +51,7 @@ interface Synth<T extends Params> {
     version: string;
     latencyBufferSeconds: number;
 
-    play(params: T, context: AudioContext, time: number): Promise<void>;
+    play(params: T, context: BaseAudioContext, time: number): Promise<void>;
 }
 
 interface TriggeredEvent<T extends Params> {
@@ -64,7 +64,7 @@ class AudioCache {
 
     constructor() {}
 
-    async get(url: string, context: AudioContext): Promise<AudioBuffer> {
+    async get(url: string, context: BaseAudioContext): Promise<AudioBuffer> {
         if (this._cache[url] !== undefined) {
             return this._cache[url];
         }
@@ -91,18 +91,18 @@ export class Sequencer implements Synth<SequencerParams> {
 
     async play(
         { events, speed }: SequencerParams,
-        context: AudioContext,
+        context: BaseAudioContext,
         time: number
     ): Promise<void> {
         for (const event of events) {
             if (event.type === SynthType.Sampler) {
-                this.sampler.play(
+                await this.sampler.play(
                     event.params as SamplerParams,
                     context,
                     time + event.timeSeconds * speed
                 );
             } else if (event.type === SynthType.Sequencer) {
-                this.play(
+                await this.play(
                     event.params as SequencerParams,
                     context,
                     time +
@@ -133,7 +133,7 @@ export class Sampler implements Synth<SamplerParams> {
             filter,
             convolve,
         }: SamplerParams,
-        context: AudioContext,
+        context: BaseAudioContext,
         time: number
     ): Promise<void> {
         const buffer = await this.cache.get(url, context);

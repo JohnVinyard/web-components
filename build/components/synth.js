@@ -42,10 +42,10 @@ export class Sequencer {
         return __awaiter(this, void 0, void 0, function* () {
             for (const event of events) {
                 if (event.type === SynthType.Sampler) {
-                    this.sampler.play(event.params, context, time + event.timeSeconds * speed);
+                    yield this.sampler.play(event.params, context, time + event.timeSeconds * speed);
                 }
                 else if (event.type === SynthType.Sequencer) {
-                    this.play(event.params, context, time +
+                    yield this.play(event.params, context, time +
                         event.timeSeconds *
                             event.params.speed);
                 }
