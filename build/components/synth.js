@@ -12,6 +12,26 @@ export var SynthType;
     SynthType["Sampler"] = "sampler";
     SynthType["Sequencer"] = "sequencer";
 })(SynthType || (SynthType = {}));
+export const applyPatternTransform = (pattern, transform) => {
+    return transform(pattern);
+};
+export const emptyPattern = () => {
+    return {
+        type: SynthType.Sequencer,
+        events: [
+            {
+                type: SynthType.Sequencer,
+                timeSeconds: 0,
+                params: {
+                    type: SynthType.Sequencer,
+                    events: [],
+                    speed: 1,
+                },
+            },
+        ],
+        speed: 1,
+    };
+};
 class AudioCache {
     constructor() {
         this._cache = {};
@@ -68,6 +88,8 @@ export class Sampler {
             const source = context.createBufferSource();
             source.buffer = buffer;
             source.channelCount = 1;
+            const g = context.createGain();
+            g.gain.setValueAtTime(0.5, 0);
             if (convolve) {
                 const verb = context.createConvolver();
                 console.log(`Fetching ${convolve.url}`);
@@ -76,10 +98,12 @@ export class Sampler {
                 verb.normalize = true;
                 verb.channelCount = 1;
                 source.connect(verb);
-                verb.connect(context.destination);
+                verb.connect(g);
+                g.connect(context.destination);
             }
             else {
-                source.connect(context.destination);
+                source.connect(g);
+                g.connect(context.destination);
             }
             source.start(context.currentTime + this.latencyBufferSeconds + time, startSeconds, durationSeconds);
         });

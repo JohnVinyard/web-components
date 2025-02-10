@@ -33,7 +33,7 @@ export interface SamplerParams {
     };
 }
 
-interface MusicalEvent {
+export interface MusicalEvent {
     timeSeconds: number;
     type: SynthType;
     params: Params;
@@ -44,6 +44,33 @@ export interface SequencerParams {
     events: MusicalEvent[];
     speed: number;
 }
+
+export type PatternTransform = (params: SequencerParams) => SequencerParams;
+
+export const applyPatternTransform = (
+    pattern: SequencerParams,
+    transform: PatternTransform
+): SequencerParams => {
+    return transform(pattern);
+};
+
+export const emptyPattern = (): SequencerParams => {
+    return {
+        type: SynthType.Sequencer,
+        events: [
+            {
+                type: SynthType.Sequencer,
+                timeSeconds: 0,
+                params: {
+                    type: SynthType.Sequencer,
+                    events: [],
+                    speed: 1,
+                },
+            },
+        ],
+        speed: 1,
+    };
+};
 
 type Params = SamplerParams | SequencerParams;
 
@@ -141,6 +168,9 @@ export class Sampler implements Synth<SamplerParams> {
         source.buffer = buffer;
         source.channelCount = 1;
 
+        const g = context.createGain();
+        g.gain.setValueAtTime(0.5, 0);
+
         if (convolve) {
             const verb = context.createConvolver();
             console.log(`Fetching ${convolve.url}`);
@@ -149,9 +179,11 @@ export class Sampler implements Synth<SamplerParams> {
             verb.normalize = true;
             verb.channelCount = 1;
             source.connect(verb);
-            verb.connect(context.destination);
+            verb.connect(g);
+            g.connect(context.destination);
         } else {
-            source.connect(context.destination);
+            source.connect(g);
+            g.connect(context.destination);
         }
 
         source.start(

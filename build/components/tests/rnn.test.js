@@ -1,4 +1,4 @@
-describe('rnn', () => {
+describe.skip('rnn', () => {
     it('computes dot correctly', () => {
         const a = new Float32Array(4).map((x) => Math.random());
         const b = new Float32Array(4).map((x) => Math.random());

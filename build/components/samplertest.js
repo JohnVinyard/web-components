@@ -7,7 +7,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-import { Sequencer, SynthType } from './synth';
+import { Sequencer, SynthType, applyPatternTransform, emptyPattern, } from './synth';
 function audioBufferToBlob(audioBuffer, type) {
     const numberOfChannels = audioBuffer.numberOfChannels;
     const sampleRate = audioBuffer.sampleRate;
@@ -86,13 +86,14 @@ export class SamplerTest extends HTMLElement {
         </div>
         <button id="render">Render</button>
         <audio id="rendered-audio" src="" controls></audio>`;
-        // https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav
         const sequencer = new Sequencer(0.01);
+        const church = 'https://matching-pursuit-reverbs.s3.amazonaws.com/St+Nicolaes+Church.wav';
+        const drumRoom = 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav';
         const params = {
             type: SynthType.Sampler,
             url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
             convolve: {
-                url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                url: drumRoom,
                 mix: 0.5,
             },
         };
@@ -100,75 +101,75 @@ export class SamplerTest extends HTMLElement {
             type: SynthType.Sampler,
             url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1snare.wav',
             convolve: {
-                url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                url: drumRoom,
                 mix: 0.5,
             },
         };
-        const speed = 1;
-        const seq = {
-            type: SynthType.Sequencer,
-            speed,
-            events: [
-                {
-                    timeSeconds: 0,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.25,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.25,
-                    params: snare,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.5,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.75,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.75,
-                    params: snare,
-                    type: SynthType.Sampler,
-                },
-            ],
-        };
-        if (!topLevel) {
-            topLevel = {
-                type: SynthType.Sequencer,
-                speed,
+        const starting = emptyPattern();
+        const fourOnTheFloor = applyPatternTransform(starting, (starting) => {
+            return {
+                type: starting.type,
+                speed: starting.speed,
                 events: [
                     {
                         timeSeconds: 0,
-                        params: seq,
-                        type: SynthType.Sequencer,
+                        params,
+                        type: SynthType.Sampler,
                     },
                     {
-                        timeSeconds: 1,
-                        params: seq,
-                        type: SynthType.Sequencer,
+                        timeSeconds: 0.25,
+                        params,
+                        type: SynthType.Sampler,
                     },
                     {
-                        timeSeconds: 2,
-                        params: seq,
-                        type: SynthType.Sequencer,
+                        timeSeconds: 0.5,
+                        params,
+                        type: SynthType.Sampler,
                     },
                     {
-                        timeSeconds: 3,
-                        params: seq,
-                        type: SynthType.Sequencer,
+                        timeSeconds: 0.75,
+                        params,
+                        type: SynthType.Sampler,
                     },
                 ],
             };
-        }
+        });
+        const withSnare = applyPatternTransform(fourOnTheFloor, (x) => {
+            return {
+                type: x.type,
+                speed: x.speed,
+                events: x.events.reduce((accum, current) => {
+                    if (current.timeSeconds === 0.25 ||
+                        current.timeSeconds === 0.75) {
+                        return [
+                            ...accum,
+                            current,
+                            {
+                                type: SynthType.Sampler,
+                                timeSeconds: current.timeSeconds,
+                                params: snare,
+                            },
+                        ];
+                    }
+                    return [...accum, current];
+                }, []),
+            };
+        });
+        const repeatFourTimes = applyPatternTransform(withSnare, (x) => {
+            return {
+                type: SynthType.Sequencer,
+                speed: 1,
+                events: [0, 1, 2, 3].map((t) => {
+                    const e = {
+                        type: SynthType.Sequencer,
+                        timeSeconds: t,
+                        params: x,
+                    };
+                    return e;
+                }),
+            };
+        });
+        topLevel = repeatFourTimes;
         const viz = shadow.getElementById('viz');
         viz.innerHTML = JSON.stringify(topLevel, null, 4);
         const code = shadow.getElementById('code-pane');
@@ -178,7 +179,10 @@ export class SamplerTest extends HTMLElement {
             topLevel = func(topLevel);
             this.render(topLevel);
         });
-        const context = new AudioContext({});
+        const context = new AudioContext({
+            sampleRate: 22050,
+            latencyHint: 'interactive',
+        });
         const button = shadow.getElementById('play-sampler');
         button.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
             sequencer.play(topLevel, context, 0);

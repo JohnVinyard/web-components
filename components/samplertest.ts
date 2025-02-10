@@ -1,4 +1,12 @@
-import { SamplerParams, Sequencer, SequencerParams, SynthType } from './synth';
+import {
+    MusicalEvent,
+    SamplerParams,
+    Sequencer,
+    SequencerParams,
+    SynthType,
+    applyPatternTransform,
+    emptyPattern,
+} from './synth';
 
 function audioBufferToBlob(audioBuffer: AudioBuffer, type: string): Blob {
     const numberOfChannels = audioBuffer.numberOfChannels;
@@ -95,15 +103,19 @@ export class SamplerTest extends HTMLElement {
         <button id="render">Render</button>
         <audio id="rendered-audio" src="" controls></audio>`;
 
-        // https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav
-
         const sequencer = new Sequencer(0.01);
+
+        const church =
+            'https://matching-pursuit-reverbs.s3.amazonaws.com/St+Nicolaes+Church.wav';
+
+        const drumRoom =
+            'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav';
 
         const params: SamplerParams = {
             type: SynthType.Sampler,
             url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1kick.wav',
             convolve: {
-                url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                url: drumRoom,
                 mix: 0.5,
             },
         };
@@ -112,78 +124,90 @@ export class SamplerTest extends HTMLElement {
             type: SynthType.Sampler,
             url: 'https://one-laptop-per-child.s3.amazonaws.com/tamtam44old/drum1snare.wav',
             convolve: {
-                url: 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav',
+                url: drumRoom,
                 mix: 0.5,
             },
         };
 
-        const speed: number = 1;
+        const starting = emptyPattern();
+        const fourOnTheFloor = applyPatternTransform(
+            starting,
+            (starting: SequencerParams): SequencerParams => {
+                return {
+                    type: starting.type,
+                    speed: starting.speed,
+                    events: [
+                        {
+                            timeSeconds: 0,
+                            params,
+                            type: SynthType.Sampler,
+                        },
+                        {
+                            timeSeconds: 0.25,
+                            params,
+                            type: SynthType.Sampler,
+                        },
+                        {
+                            timeSeconds: 0.5,
+                            params,
+                            type: SynthType.Sampler,
+                        },
+                        {
+                            timeSeconds: 0.75,
+                            params,
+                            type: SynthType.Sampler,
+                        },
+                    ],
+                };
+            }
+        );
 
-        const seq: SequencerParams = {
-            type: SynthType.Sequencer,
-            speed,
-            events: [
-                {
-                    timeSeconds: 0,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.25,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.25,
-                    params: snare,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.5,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.75,
-                    params,
-                    type: SynthType.Sampler,
-                },
-                {
-                    timeSeconds: 0.75,
-                    params: snare,
-                    type: SynthType.Sampler,
-                },
-            ],
-        };
+        const withSnare = applyPatternTransform(
+            fourOnTheFloor,
+            (x: SequencerParams): SequencerParams => {
+                return {
+                    type: x.type,
+                    speed: x.speed,
+                    events: x.events.reduce((accum, current) => {
+                        if (
+                            current.timeSeconds === 0.25 ||
+                            current.timeSeconds === 0.75
+                        ) {
+                            return [
+                                ...accum,
+                                current,
+                                {
+                                    type: SynthType.Sampler,
+                                    timeSeconds: current.timeSeconds,
+                                    params: snare,
+                                },
+                            ];
+                        }
+                        return [...accum, current];
+                    }, []),
+                };
+            }
+        );
 
-        if (!topLevel) {
-            topLevel = {
-                type: SynthType.Sequencer,
-                speed,
-                events: [
-                    {
-                        timeSeconds: 0,
-                        params: seq,
-                        type: SynthType.Sequencer,
-                    },
-                    {
-                        timeSeconds: 1,
-                        params: seq,
-                        type: SynthType.Sequencer,
-                    },
-                    {
-                        timeSeconds: 2,
-                        params: seq,
-                        type: SynthType.Sequencer,
-                    },
-                    {
-                        timeSeconds: 3,
-                        params: seq,
-                        type: SynthType.Sequencer,
-                    },
-                ],
-            };
-        }
+        const repeatFourTimes = applyPatternTransform(
+            withSnare,
+            (x: SequencerParams): SequencerParams => {
+                return {
+                    type: SynthType.Sequencer,
+                    speed: 1,
+                    events: [0, 1, 2, 3].map((t) => {
+                        const e: MusicalEvent = {
+                            type: SynthType.Sequencer,
+                            timeSeconds: t,
+                            params: x,
+                        };
+                        return e;
+                    }),
+                };
+            }
+        );
+
+        topLevel = repeatFourTimes;
 
         const viz = shadow.getElementById('viz');
         viz.innerHTML = JSON.stringify(topLevel, null, 4);
@@ -197,7 +221,10 @@ export class SamplerTest extends HTMLElement {
             this.render(topLevel);
         });
 
-        const context = new AudioContext({});
+        const context = new AudioContext({
+            sampleRate: 22050,
+            latencyHint: 'interactive',
+        });
 
         const button = shadow.getElementById('play-sampler');
         button.addEventListener('click', async () => {
