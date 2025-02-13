@@ -51,12 +51,40 @@ class AudioCache {
             return pr;
         });
     }
+    getDuration(url, context) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const buf = yield this.get(url, context);
+            return buf.duration;
+        });
+    }
 }
 export class Sequencer {
     constructor(latencyBufferSeconds = 0.01) {
         this.latencyBufferSeconds = latencyBufferSeconds;
         this.version = '0.0.1';
         this.sampler = new Sampler(latencyBufferSeconds);
+    }
+    durationHint({ events, speed }, context, time, maxEndTime = 0) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let met = maxEndTime;
+            for (const event of events) {
+                const t = time + event.timeSeconds * speed;
+                let duration = 0;
+                if (event.type === SynthType.Sampler) {
+                    duration = yield this.sampler.getDuration(event.params, context);
+                }
+                else if (event.type === SynthType.Sequencer) {
+                    duration = yield this.durationHint(event.params, context, t, met);
+                }
+                else {
+                    throw new Error('Unsupported');
+                }
+                if (t + duration > met) {
+                    met = t + duration;
+                }
+            }
+            return met;
+        });
     }
     play({ events, speed }, context, time) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -81,6 +109,17 @@ export class Sampler {
         this.latencyBufferSeconds = latencyBufferSeconds;
         this.version = '0.0.1';
         this.cache = new AudioCache();
+    }
+    getDuration(params, context) {
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            return Math.max(...(yield Promise.all([
+                this.cache.getDuration(params.url, context),
+                ((_a = params.convolve) === null || _a === void 0 ? void 0 : _a.url)
+                    ? this.cache.getDuration((_b = params.convolve) === null || _b === void 0 ? void 0 : _b.url, context)
+                    : 0,
+            ])));
+        });
     }
     play({ url, startSeconds, durationSeconds, gain, filter, convolve, }, context, time) {
         return __awaiter(this, void 0, void 0, function* () {

@@ -225,8 +225,19 @@ export class SamplerTest extends HTMLElement {
 
         const renderButton = shadow.getElementById('render');
         renderButton.addEventListener('click', async () => {
-            // TODO: how do I determine length?
-            const offline = new OfflineAudioContext(1, 22050 * 20, 22050);
+            // TODO: I believe this is buggy currently, but is better than
+            // having no data-driven method in place
+            const durationSeconds = await sequencer.durationHint(
+                topLevel,
+                context,
+                0
+            );
+
+            const offline = new OfflineAudioContext(
+                1,
+                22050 * durationSeconds,
+                22050
+            );
 
             await sequencer.play(topLevel, offline, 0);
             const result = await offline.startRendering();

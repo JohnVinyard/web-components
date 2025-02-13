@@ -106,6 +106,11 @@ class AudioCache {
         this._cache[url] = pr;
         return pr;
     }
+
+    async getDuration(url: string, context: BaseAudioContext): Promise<number> {
+        const buf = await this.get(url, context);
+        return buf.duration;
+    }
 }
 
 export class Sequencer implements Synth<SequencerParams> {
@@ -114,6 +119,42 @@ export class Sequencer implements Synth<SequencerParams> {
 
     constructor(public readonly latencyBufferSeconds: number = 0.01) {
         this.sampler = new Sampler(latencyBufferSeconds);
+    }
+
+    async durationHint(
+        { events, speed }: SequencerParams,
+        context: BaseAudioContext,
+        time: number,
+        maxEndTime: number = 0
+    ): Promise<number> {
+        let met = maxEndTime;
+
+        for (const event of events) {
+            const t = time + event.timeSeconds * speed;
+            let duration = 0;
+
+            if (event.type === SynthType.Sampler) {
+                duration = await this.sampler.getDuration(
+                    event.params as SamplerParams,
+                    context
+                );
+            } else if (event.type === SynthType.Sequencer) {
+                duration = await this.durationHint(
+                    event.params as SequencerParams,
+                    context,
+                    t,
+                    met
+                );
+            } else {
+                throw new Error('Unsupported');
+            }
+
+            if (t + duration > met) {
+                met = t + duration;
+            }
+        }
+
+        return met;
     }
 
     async play(
@@ -149,6 +190,20 @@ export class Sampler implements Synth<SamplerParams> {
 
     constructor(public readonly latencyBufferSeconds: number = 0.01) {
         this.cache = new AudioCache();
+    }
+
+    async getDuration(
+        params: SamplerParams,
+        context: BaseAudioContext
+    ): Promise<number> {
+        return Math.max(
+            ...(await Promise.all([
+                this.cache.getDuration(params.url, context),
+                params.convolve?.url
+                    ? this.cache.getDuration(params.convolve?.url, context)
+                    : 0,
+            ]))
+        );
     }
 
     async play(
