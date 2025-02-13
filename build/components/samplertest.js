@@ -76,16 +76,13 @@ export class SamplerTest extends HTMLElement {
         </style>
         <div id="play-sampler">
             <pre><code id="viz"></code></pre>
-            <textarea id="code-pane">
-            (x) => {
-                return x;
-            }
-            </textarea>
-        <button id="evaluate">Evaluate</button>
         
         </div>
         <button id="render">Render</button>
-        <audio id="rendered-audio" src="" controls></audio>`;
+        <a id="rendered-audio" href="" download><a/>
+        
+        
+        `;
         const sequencer = new Sequencer(0.01);
         const church = 'https://matching-pursuit-reverbs.s3.amazonaws.com/St+Nicolaes+Church.wav';
         const drumRoom = 'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice+Drum+Room.wav';
@@ -172,13 +169,6 @@ export class SamplerTest extends HTMLElement {
         topLevel = repeatFourTimes;
         const viz = shadow.getElementById('viz');
         viz.innerHTML = JSON.stringify(topLevel, null, 4);
-        const code = shadow.getElementById('code-pane');
-        const evaluate = shadow.getElementById('evaluate');
-        evaluate.addEventListener('click', () => {
-            const func = eval(code.value);
-            topLevel = func(topLevel);
-            this.render(topLevel);
-        });
         const context = new AudioContext({
             sampleRate: 22050,
             latencyHint: 'interactive',
@@ -190,12 +180,14 @@ export class SamplerTest extends HTMLElement {
         const audioElement = shadow.getElementById('rendered-audio');
         const renderButton = shadow.getElementById('render');
         renderButton.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
-            const offline = new OfflineAudioContext(1, 44100 * 20, 44100);
+            // TODO: how do I determine length?
+            const offline = new OfflineAudioContext(1, 22050 * 20, 22050);
             yield sequencer.play(topLevel, offline, 0);
             const result = yield offline.startRendering();
             const blob = audioBufferToBlob(result, 'audio/wav');
             const url = URL.createObjectURL(blob);
-            audioElement.src = url;
+            audioElement.href = url;
+            audioElement.innerText = 'Download';
         }));
     }
     connectedCallback() {

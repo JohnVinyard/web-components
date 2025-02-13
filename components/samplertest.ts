@@ -92,16 +92,13 @@ export class SamplerTest extends HTMLElement {
         </style>
         <div id="play-sampler">
             <pre><code id="viz"></code></pre>
-            <textarea id="code-pane">
-            (x) => {
-                return x;
-            }
-            </textarea>
-        <button id="evaluate">Evaluate</button>
         
         </div>
         <button id="render">Render</button>
-        <audio id="rendered-audio" src="" controls></audio>`;
+        <a id="rendered-audio" href="" download><a/>
+        
+        
+        `;
 
         const sequencer = new Sequencer(0.01);
 
@@ -212,15 +209,6 @@ export class SamplerTest extends HTMLElement {
         const viz = shadow.getElementById('viz');
         viz.innerHTML = JSON.stringify(topLevel, null, 4);
 
-        const code = shadow.getElementById('code-pane') as HTMLTextAreaElement;
-        const evaluate = shadow.getElementById('evaluate');
-
-        evaluate.addEventListener('click', () => {
-            const func = eval(code.value);
-            topLevel = func(topLevel);
-            this.render(topLevel);
-        });
-
         const context = new AudioContext({
             sampleRate: 22050,
             latencyHint: 'interactive',
@@ -233,18 +221,21 @@ export class SamplerTest extends HTMLElement {
 
         const audioElement = shadow.getElementById(
             'rendered-audio'
-        ) as HTMLAudioElement;
+        ) as HTMLAnchorElement;
 
         const renderButton = shadow.getElementById('render');
         renderButton.addEventListener('click', async () => {
-            const offline = new OfflineAudioContext(1, 44100 * 20, 44100);
+            // TODO: how do I determine length?
+            const offline = new OfflineAudioContext(1, 22050 * 20, 22050);
 
             await sequencer.play(topLevel, offline, 0);
             const result = await offline.startRendering();
 
             const blob = audioBufferToBlob(result, 'audio/wav');
             const url = URL.createObjectURL(blob);
-            audioElement.src = url;
+
+            audioElement.href = url;
+            audioElement.innerText = 'Download';
         });
     }
 
