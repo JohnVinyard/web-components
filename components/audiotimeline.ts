@@ -47,14 +47,6 @@ export class AudioTimeline extends HTMLElement {
         // establish bounds for x and y axes
         const events = this.eventData;
 
-        // const y = events.map((p) => p.y);
-
-        // const [xMin, xMax] = [0, this.duration];
-        // const xSpan = xMax - xMin;
-
-        // const [yMin, yMax] = [0, 1];
-        // const ySpan = yMax - yMin;
-
         const eventComponent = (event: Event): string => {
             const step = event.eventDuration / event.eventEnvelope.length;
 
@@ -119,6 +111,8 @@ export class AudioTimeline extends HTMLElement {
 
         shadow.querySelectorAll('g').forEach((element, index) => {
             element.addEventListener('click', (evt: PointerEvent) => {
+                evt.stopPropagation();
+
                 const event = events[index];
 
                 playAudio(

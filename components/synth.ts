@@ -4,7 +4,7 @@ export enum SynthType {
 }
 
 interface GainKeyPoint {
-    time: number;
+    time_seconds: number;
     gain: number;
 }
 
@@ -27,7 +27,7 @@ export interface SamplerParams {
     convolve?: {
         url: string;
         /**
-         * How much of the "wet signal is included"
+         * How much of the "wet" signal is included
          */
         mix: number;
     };
