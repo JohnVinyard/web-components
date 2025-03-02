@@ -21,7 +21,7 @@ export class PhysicalStringSimulation extends HTMLElement {
         shadow.innerHTML = `
         <style>
             #click-area {
-                width: 100%;
+                width: 600px;
                 height: 200px;
                 cursor: pointer;
                 background-color: #e6bfdb;
