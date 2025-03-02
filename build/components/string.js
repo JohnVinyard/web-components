@@ -21,7 +21,7 @@ export class PhysicalStringSimulation extends HTMLElement {
         shadow.innerHTML = `
         <style>
             #click-area {
-                width: 100%;
+                width: 600px;
                 height: 200px;
                 cursor: pointer;
                 background-color: #e6bfdb;
@@ -41,7 +41,7 @@ export class PhysicalStringSimulation extends HTMLElement {
             try {
                 yield context.audioWorklet.addModule(
                 // '/build/components/physical.js'
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.59/build/components/physical.js');
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.60/build/components/physical.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
