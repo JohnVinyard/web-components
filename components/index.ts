@@ -7,6 +7,7 @@ import { AudioTimeline } from './audiotimeline';
 import { Instrument } from './instrument';
 import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
+import { PhysicalStringSimulation } from './string';
 
 export {
     AudioView,
@@ -18,4 +19,5 @@ export {
     Instrument,
     Sampler,
     SamplerTest,
+    PhysicalStringSimulation,
 };

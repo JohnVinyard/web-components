@@ -7,5 +7,6 @@ import { AudioTimeline } from './audiotimeline';
 import { Instrument } from './instrument';
 import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, };
+import { PhysicalStringSimulation } from './string';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, };
 //# sourceMappingURL=index.js.map

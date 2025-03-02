@@ -294,4 +294,4 @@ class Physical extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor('physical-string-sim', Rnn);
+registerProcessor('physical-string-sim', Physical);

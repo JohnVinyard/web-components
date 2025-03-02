@@ -209,5 +209,5 @@ class Physical extends AudioWorkletProcessor {
         return true;
     }
 }
-registerProcessor('physical-string-sim', Rnn);
+registerProcessor('physical-string-sim', Physical);
 //# sourceMappingURL=physical.js.map
