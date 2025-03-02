@@ -13,6 +13,10 @@ const zerosLike = (x: Float32Array): Float32Array => {
     return new Float32Array(x.length).fill(0);
 };
 
+const vectorSum = (vec: Float32Array): number => {
+    return vec.reduce((accum, current) => accum + current, 0);
+};
+
 const vectorScalarDivide = (
     vec: Float32Array,
     scalar: number
@@ -27,12 +31,23 @@ const vectorScalarMultiply = (
     throw new Error('Not Implemented');
 };
 
+const l2Norm = (vec: Float32Array): number => {
+    const squared = vec.map((x) => x ** 2);
+    return Math.sqrt(vectorSum(squared));
+};
+
+const distance = (a: Float32Array, b: Float32Array): number => {
+    const diff = elementwiseDifference(a, b);
+    return l2Norm(diff);
+};
+
 class Mass {
     private origPosition: Float32Array = null;
     private acceleration: Float32Array = null;
     private velocity: Float32Array = null;
 
     constructor(
+        public readonly id: string,
         public position: Float32Array,
         public mass: number,
         public damping: number,
@@ -66,87 +81,189 @@ class Mass {
         this.position = elementwiseAdd(this.position, this.velocity);
     }
 
-    public clear() {}
+    public clear() {
+        this.velocity = vectorScalarMultiply(this.velocity, this.damping);
+        this.acceleration = this.acceleration.fill(0);
+    }
+}
+
+class Spring {
+    private m1Resting: Float32Array;
+    private m2Resting: Float32Array;
+
+    constructor(public m1: Mass, public m2: Mass, public tension: number) {
+        this.m1Resting = elementwiseDifference(m1.position, m2.position);
+        this.m2Resting = elementwiseDifference(m2.position, m1.position);
+    }
+
+    public get masses(): Mass[] {
+        return [this.m2, this.m2];
+    }
+
+    public updateForces() {
+        // compute for m1
+        const current = elementwiseDifference(
+            this.m1.position,
+            this.m2.position
+        );
+        const displacement = elementwiseDifference(this.m1Resting, current);
+        this.m1.applyForce(vectorScalarMultiply(displacement, this.tension));
+
+        // compute for m2
+        const c2 = elementwiseDifference(this.m2.position, this.m2.position);
+        const d2 = elementwiseDifference(this.m2Resting, c2);
+        this.m2.applyForce(vectorScalarMultiply(d2, this.tension));
+    }
+}
+
+class Force {
+    constructor(
+        public readonly location: Float32Array,
+        public readonly force: Float32Array
+    ) {}
+}
+
+class SpringMesh {
+    private readonly masses: Mass[];
+
+    constructor(private readonly springs: Spring[]) {
+        this.masses = Object.values(
+            springs.reduce((accum: Record<string, Mass>, current: Spring) => {
+                accum[current.m1.id] = current.m1;
+                accum[current.m2.id] = current.m2;
+                return accum;
+            }, {})
+        );
+    }
+
+    public findNearestMass(force: Force): Mass {
+        let smallestDistance = Number.MAX_VALUE;
+        let closestMassIndex = -1;
+
+        this.masses.forEach((m, index) => {
+            const dist = distance(m.position, force.location);
+            if (dist < smallestDistance) {
+                smallestDistance = dist;
+                closestMassIndex = index;
+            }
+        });
+
+        return this.masses[closestMassIndex];
+    }
+
+    public updateForces() {
+        for (const spring of this.springs) {
+            spring.updateForces();
+        }
+    }
+
+    public updateVelocities() {
+        for (const mass of this.masses) {
+            mass.updateVelocity();
+        }
+    }
+
+    public updatePositions() {
+        for (const mass of this.masses) {
+            mass.updatePosition();
+        }
+    }
+
+    public clear() {
+        for (const mass of this.masses) {
+            mass.clear();
+        }
+    }
+
+    public simulationStep(force: Force | null): number {
+        if (force !== null) {
+            const nearest = this.findNearestMass(force);
+            nearest.applyForce(force.force);
+        }
+
+        this.updateForces();
+        this.updateVelocities();
+        this.updatePositions();
+        this.clear();
+
+        const outputSample: number = this.masses.reduce((accum, mass) => {
+            return accum + l2Norm(mass.diff);
+        }, 0);
+
+        return outputSample;
+    }
 }
 
 /**
- * class Mass(object):
+ * def build_string():
+    mass = 10
+    tension = 0.9
+    damping = 0.9998
+    n_masses = 100
 
-    def __init__(
-            self,
-            _id: str,
-            position: np.ndarray,
-            mass: float,
-            damping: float,
-            fixed: bool = False):
-        super().__init__()
-        self._id = _id
-        self.position = position.astype(np.float32)
-        self.orig_position = self.position.copy()
-        self.mass = mass
-        self.damping = damping
-        self.acceleration = np.zeros_like(self.position)
-        self.velocity = np.zeros_like(self.position)
-        self.fixed = fixed
+    x_pos = np.linspace(0, 1, num=n_masses)
+    positions = np.zeros((n_masses, 3))
+    positions[:, 0] = x_pos
 
-    
+    masses = [
+        Mass(str(i), pos, mass, damping, fixed=i == 0 or i == n_masses - 1)
+        for i, pos in enumerate(positions)
+    ]
 
-    def diff(self):
-        return self.position - self.orig_position
+    springs = [
+        Spring(masses[i], masses[i + 1], tension)
+        for i in range(n_masses - 1)
+    ]
 
-    def apply_force(self, force: np.ndarray):
-        self.acceleration += force / self.mass
-
-    def update_velocity(self):
-        self.velocity += self.acceleration
-
-    def update_position(self):
-        if self.fixed:
-            return
-
-        self.position += self.velocity
-
-    def clear(self):
-        self.velocity *= self.damping
-        self.acceleration = np.zeros_like(self.acceleration)
-
-
-class Spring(object):
-    def __init__(self, m1: Mass, m2: Mass, tension: float):
-        super().__init__()
-        self.m1 = m1
-        self.m2 = m2
-        self.tension = tension
-
-        # 3D vector representing the resting state/length of the spring
-        self.m1_resting = self.m1.position - self.m2.position
-        self.m2_resting = self.m2.position - self.m1.position
-
-    def __str__(self):
-        return f'Spring({self.m1}, {self.m2}, {self.tension})'
-
-    def __repr__(self):
-        return self.__str__()
-
-    def masses(self):
-        return [self.m1, self.m2]
-
-    def update_forces(self):
-        # compute for m1
-        current = self.m1.position - self.m2.position
-        displacement = self.m1_resting - current
-        self.m1.apply_force(displacement * self.tension)
-
-        # compute for m2
-        current = self.m2.position - self.m1.position
-        displacement = self.m2_resting - current
-        self.m2.apply_force(displacement * self.tension)
+    mesh = SpringMesh(springs)
+    return mesh
 
  */
 
+const buildString = (
+    mass: number = 10,
+    tension: number = 0.9,
+    damping: number = 0.9998,
+    nMasses: number = 16
+): SpringMesh => {
+    // Create the masses
+
+    let masses: Mass[] = [];
+    for (let i = 0; i < nMasses; i++) {
+        const newMass = new Mass(
+            i.toString(),
+            new Float32Array([0, i]),
+            mass,
+            damping,
+            i === 0 || i === nMasses - 1
+        );
+        masses.push(newMass);
+    }
+
+    let springs: Spring[] = [];
+    for (let i = 0; i < nMasses - 1; i++) {
+        const newSpring = new Spring(masses[i], masses[i + 1], tension);
+    }
+
+    const mesh = new SpringMesh(springs);
+    return mesh;
+};
+
+interface ForceInjectionEvent {
+    force: Float32Array;
+    location: Float32Array;
+}
+
 class Physical extends AudioWorkletProcessor {
+    private eventQueue: ForceInjectionEvent[] = [];
+    private mesh: SpringMesh = null;
+
     constructor(options: AudioWorkletNodeOptions) {
         super();
+        this.mesh = buildString();
+        this.port.onmessage = (event: MessageEvent<ForceInjectionEvent>) => {
+            this.eventQueue.push(event.data);
+        };
     }
 
     process(
@@ -154,6 +271,27 @@ class Physical extends AudioWorkletProcessor {
         outputs: Float32Array[][],
         parameters: Record<string, Float32Array>
     ): boolean {
+        const left = outputs[0][0];
+
+        const nSteps = left.length;
+
+        const f: ForceInjectionEvent | undefined = this.eventQueue.shift();
+
+        const output: Float32Array = new Float32Array(nSteps);
+
+        for (let i = 0; i < nSteps; i++) {
+            if (i === 0 && f !== undefined) {
+                const frce = new Force(f.location, f.force);
+                output[i] = this.mesh.simulationStep(frce);
+            } else {
+                output[i] = this.mesh.simulationStep(null);
+            }
+        }
+
+        left.set(output);
+
         return true;
     }
 }
+
+registerProcessor('physical-string-sim', Rnn);
