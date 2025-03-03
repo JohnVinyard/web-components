@@ -177,6 +177,7 @@ const buildString = (mass = 10, tension = 0.9, damping = 0.9998, nMasses = 16) =
     let springs = [];
     for (let i = 0; i < nMasses - 1; i++) {
         const newSpring = new Spring(masses[i], masses[i + 1], tension);
+        springs.push(newSpring);
     }
     const mesh = new SpringMesh(springs);
     return mesh;

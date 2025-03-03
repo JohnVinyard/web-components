@@ -243,6 +243,7 @@ const buildString = (
     let springs: Spring[] = [];
     for (let i = 0; i < nMasses - 1; i++) {
         const newSpring = new Spring(masses[i], masses[i + 1], tension);
+        springs.push(newSpring);
     }
 
     const mesh = new SpringMesh(springs);
