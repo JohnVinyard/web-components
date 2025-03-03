@@ -39,7 +39,7 @@ export class PhysicalStringSimulation extends HTMLElement {
         <style>
             #click-area {
                 width: 100%;
-                height: 400px;
+                height: 50vh;
                 cursor: pointer;
                 background-color: #e6bfdb;
                 position: relative;
@@ -80,8 +80,8 @@ export class PhysicalStringSimulation extends HTMLElement {
                 id="tension-slider" 
                 value="0.5"
                 min="0.01"
-                max="10"
-                step="0.01"
+                max="5"
+                step="0.001"
             />
         </div>
         <div class="control">
@@ -223,7 +223,7 @@ export class PhysicalStringSimulation extends HTMLElement {
                     0,
                     event.clientX / clickedElement.offsetWidth,
                 ]),
-                force: new Float32Array([0.5, 0]),
+                force: new Float32Array([0.1 + Math.random() * 0.5, 0]),
                 type: 'force-injection',
             };
 
