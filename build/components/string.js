@@ -41,7 +41,7 @@ export class PhysicalStringSimulation extends HTMLElement {
             try {
                 yield context.audioWorklet.addModule(
                 // '/build/components/physical.js'
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.61/build/components/physical.js');
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.62/build/components/physical.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
@@ -56,7 +56,10 @@ export class PhysicalStringSimulation extends HTMLElement {
         clickArea.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
             var _a;
             yield initialize();
-            const force = new Force(new Float32Array([0, Math.random()]), new Float32Array([0.1, 0.1]));
+            const force = {
+                location: new Float32Array([0, Math.random()]),
+                force: new Float32Array([0.1, 0.1]),
+            };
             if ((_a = this.node) === null || _a === void 0 ? void 0 : _a.port) {
                 this.node.port.postMessage(force);
             }
