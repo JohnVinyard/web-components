@@ -14,7 +14,7 @@ const vectorScalarDivide = (vec, scalar) => {
     return vec.map((x) => x / scalar);
 };
 const vectorScalarMultiply = (vec, scalar) => {
-    throw new Error('Not Implemented');
+    return vec.map((x) => x * scalar);
 };
 const l2Norm = (vec) => {
     const squared = vec.map((x) => Math.pow(x, 2));

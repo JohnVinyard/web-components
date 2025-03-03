@@ -28,7 +28,7 @@ const vectorScalarMultiply = (
     vec: Float32Array,
     scalar: number
 ): Float32Array => {
-    throw new Error('Not Implemented');
+    return vec.map((x) => x * scalar);
 };
 
 const l2Norm = (vec: Float32Array): number => {

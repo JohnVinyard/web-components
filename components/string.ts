@@ -44,7 +44,7 @@ export class PhysicalStringSimulation extends HTMLElement {
             try {
                 await context.audioWorklet.addModule(
                     // '/build/components/physical.js'
-                    'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.63/build/components/physical.js'
+                    'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.65/build/components/physical.js'
                 );
             } catch (err) {
                 console.log(`Failed to add module due to ${err}`);
