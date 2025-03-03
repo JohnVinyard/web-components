@@ -44,7 +44,9 @@ export class PhysicalStringSimulation extends HTMLElement {
 
             .control {
                 margin-top: 15px;
-                width: 100%;
+                margin-left: 15vw;
+                margin-right: 15vw;
+                width: 60vw;
                 font-size: 2em;
             }
             .control input {
