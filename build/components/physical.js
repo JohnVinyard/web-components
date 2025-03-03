@@ -20,9 +20,21 @@ const l2Norm = (vec) => {
     const squared = vec.map((x) => Math.pow(x, 2));
     return Math.sqrt(vectorSum(squared));
 };
+const el1Norm = (vec) => {
+    return vectorSum(vec.map(Math.abs));
+};
 const distance = (a, b) => {
     const diff = elementwiseDifference(a, b);
     return l2Norm(diff);
+};
+const clamp = (value, min, max) => {
+    if (value < min) {
+        return min;
+    }
+    if (value > max) {
+        return max;
+    }
+    return value;
 };
 class Mass {
     constructor(id, position, mass, damping, fixed = false) {
@@ -42,7 +54,7 @@ class Mass {
         return elementwiseDifference(this.position, this.origPosition);
     }
     applyForce(force) {
-        this.acceleration = elementwiseAdd(this.velocity, vectorScalarDivide(force, this.mass));
+        this.acceleration = elementwiseAdd(this.acceleration, vectorScalarDivide(force, this.mass));
     }
     updateVelocity() {
         this.velocity = elementwiseAdd(this.velocity, this.acceleration);
@@ -75,7 +87,7 @@ class Spring {
         const displacement = elementwiseDifference(this.m1Resting, current);
         this.m1.applyForce(vectorScalarMultiply(displacement, this.tension));
         // compute for m2
-        const c2 = elementwiseDifference(this.m2.position, this.m2.position);
+        const c2 = elementwiseDifference(this.m2.position, this.m1.position);
         const d2 = elementwiseDifference(this.m2Resting, c2);
         this.m2.applyForce(vectorScalarMultiply(d2, this.tension));
     }
@@ -94,6 +106,20 @@ class SpringMesh {
             accum[current.m2.id] = current.m2;
             return accum;
         }, {}));
+    }
+    toMeshInfo() {
+        return {
+            masses: this.masses.map(({ position }) => ({ position })),
+        };
+    }
+    adjustTension(newTension) {
+        this.springs.forEach((s) => (s.tension = newTension));
+    }
+    adjustMass(newMass) {
+        this.masses.forEach((m) => (m.mass = newMass));
+    }
+    adjustDamping(newDamping) {
+        this.masses.forEach((m) => (m.damping = newDamping));
     }
     findNearestMass(force) {
         let smallestDistance = Number.MAX_VALUE;
@@ -130,6 +156,7 @@ class SpringMesh {
     simulationStep(force) {
         if (force !== null) {
             const nearest = this.findNearestMass(force);
+            console.log('NEAREST', nearest);
             nearest.applyForce(force.force);
         }
         this.updateForces();
@@ -137,7 +164,7 @@ class SpringMesh {
         this.updatePositions();
         this.clear();
         const outputSample = this.masses.reduce((accum, mass) => {
-            return accum + l2Norm(mass.diff);
+            return accum + el1Norm(mass.diff);
         }, 0);
         return outputSample;
     }
@@ -167,11 +194,11 @@ class SpringMesh {
     return mesh
 
  */
-const buildString = (mass = 10, tension = 0.9, damping = 0.9998, nMasses = 16) => {
+const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 16) => {
     // Create the masses
     let masses = [];
     for (let i = 0; i < nMasses; i++) {
-        const newMass = new Mass(i.toString(), new Float32Array([0, i]), mass, damping, i === 0 || i === nMasses - 1);
+        const newMass = new Mass(i.toString(), new Float32Array([0, i / nMasses]), mass, damping, i === 0 || i === nMasses - 1);
         masses.push(newMass);
     }
     let springs = [];
@@ -187,9 +214,25 @@ class Physical extends AudioWorkletProcessor {
         super();
         this.eventQueue = [];
         this.mesh = null;
+        this.samplesComputed = 0;
         this.mesh = buildString();
+        this.port.postMessage(this.mesh.toMeshInfo());
         this.port.onmessage = (event) => {
-            this.eventQueue.push(event.data);
+            if (event.data.type === 'force-injection') {
+                this.eventQueue.push(event.data);
+            }
+            else if (event.data.type === 'adjust-parameter') {
+                const { name, value } = event.data;
+                if (name === 'mass') {
+                    this.mesh.adjustMass(value);
+                }
+                else if (name === 'tension') {
+                    this.mesh.adjustTension(value);
+                }
+                else if (name === 'damping') {
+                    this.mesh.adjustDamping(value);
+                }
+            }
         };
     }
     process(inputs, outputs, parameters) {
@@ -205,8 +248,12 @@ class Physical extends AudioWorkletProcessor {
             else {
                 output[i] = this.mesh.simulationStep(null);
             }
+            this.samplesComputed += 1;
         }
         left.set(output);
+        if (this.samplesComputed % 1024 === 0) {
+            this.port.postMessage(this.mesh.toMeshInfo());
+        }
         return true;
     }
 }

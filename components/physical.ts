@@ -36,9 +36,25 @@ const l2Norm = (vec: Float32Array): number => {
     return Math.sqrt(vectorSum(squared));
 };
 
+const el1Norm = (vec: Float32Array): number => {
+    return vectorSum(vec.map(Math.abs));
+};
+
 const distance = (a: Float32Array, b: Float32Array): number => {
     const diff = elementwiseDifference(a, b);
     return l2Norm(diff);
+};
+
+const clamp = (value: number, min: number, max: number): number => {
+    if (value < min) {
+        return min;
+    }
+
+    if (value > max) {
+        return max;
+    }
+
+    return value;
 };
 
 class Mass {
@@ -64,7 +80,7 @@ class Mass {
 
     public applyForce(force: Float32Array) {
         this.acceleration = elementwiseAdd(
-            this.velocity,
+            this.acceleration,
             vectorScalarDivide(force, this.mass)
         );
     }
@@ -110,7 +126,7 @@ class Spring {
         this.m1.applyForce(vectorScalarMultiply(displacement, this.tension));
 
         // compute for m2
-        const c2 = elementwiseDifference(this.m2.position, this.m2.position);
+        const c2 = elementwiseDifference(this.m2.position, this.m1.position);
         const d2 = elementwiseDifference(this.m2Resting, c2);
         this.m2.applyForce(vectorScalarMultiply(d2, this.tension));
     }
@@ -134,6 +150,24 @@ class SpringMesh {
                 return accum;
             }, {})
         );
+    }
+
+    public toMeshInfo(): MeshInfo {
+        return {
+            masses: this.masses.map(({ position }) => ({ position })),
+        };
+    }
+
+    public adjustTension(newTension: number) {
+        this.springs.forEach((s) => (s.tension = newTension));
+    }
+
+    public adjustMass(newMass: number) {
+        this.masses.forEach((m) => (m.mass = newMass));
+    }
+
+    public adjustDamping(newDamping: number) {
+        this.masses.forEach((m) => (m.damping = newDamping));
     }
 
     public findNearestMass(force: Force): Mass {
@@ -178,6 +212,7 @@ class SpringMesh {
     public simulationStep(force: Force | null): number {
         if (force !== null) {
             const nearest = this.findNearestMass(force);
+            console.log('NEAREST', nearest);
             nearest.applyForce(force.force);
         }
 
@@ -187,7 +222,7 @@ class SpringMesh {
         this.clear();
 
         const outputSample: number = this.masses.reduce((accum, mass) => {
-            return accum + l2Norm(mass.diff);
+            return accum + el1Norm(mass.diff);
         }, 0);
 
         return outputSample;
@@ -222,7 +257,7 @@ class SpringMesh {
 
 const buildString = (
     mass: number = 10,
-    tension: number = 0.9,
+    tension: number = 0.5,
     damping: number = 0.9998,
     nMasses: number = 16
 ): SpringMesh => {
@@ -232,7 +267,7 @@ const buildString = (
     for (let i = 0; i < nMasses; i++) {
         const newMass = new Mass(
             i.toString(),
-            new Float32Array([0, i]),
+            new Float32Array([0, i / nMasses]),
             mass,
             damping,
             i === 0 || i === nMasses - 1
@@ -253,17 +288,51 @@ const buildString = (
 interface ForceInjectionEvent {
     force: Float32Array;
     location: Float32Array;
+    type: 'force-injection';
 }
+
+interface AdjustParameterEvent {
+    value: number;
+    name: 'tension' | 'mass' | 'damping';
+    type: 'adjust-parameter';
+}
+
+interface MassInfo {
+    position: Float32Array;
+}
+
+interface MeshInfo {
+    masses: MassInfo[];
+}
+
+type CommunicationEvent = ForceInjectionEvent | AdjustParameterEvent;
 
 class Physical extends AudioWorkletProcessor {
     private eventQueue: ForceInjectionEvent[] = [];
     private mesh: SpringMesh = null;
+    private samplesComputed = 0;
 
     constructor(options: AudioWorkletNodeOptions) {
         super();
+
         this.mesh = buildString();
-        this.port.onmessage = (event: MessageEvent<ForceInjectionEvent>) => {
-            this.eventQueue.push(event.data);
+
+        this.port.postMessage(this.mesh.toMeshInfo());
+
+        this.port.onmessage = (event: MessageEvent<CommunicationEvent>) => {
+            if (event.data.type === 'force-injection') {
+                this.eventQueue.push(event.data);
+            } else if (event.data.type === 'adjust-parameter') {
+                const { name, value } = event.data;
+
+                if (name === 'mass') {
+                    this.mesh.adjustMass(value);
+                } else if (name === 'tension') {
+                    this.mesh.adjustTension(value);
+                } else if (name === 'damping') {
+                    this.mesh.adjustDamping(value);
+                }
+            }
         };
     }
 
@@ -287,9 +356,14 @@ class Physical extends AudioWorkletProcessor {
             } else {
                 output[i] = this.mesh.simulationStep(null);
             }
+            this.samplesComputed += 1;
         }
 
         left.set(output);
+
+        if (this.samplesComputed % 1024 === 0) {
+            this.port.postMessage(this.mesh.toMeshInfo());
+        }
 
         return true;
     }
