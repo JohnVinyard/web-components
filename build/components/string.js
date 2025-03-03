@@ -37,12 +37,18 @@ export class PhysicalStringSimulation extends HTMLElement {
                 left: 50%;
                 transform: translate(-50%, -50%);
             }
-
+            
             label {
                 color: #eee;
             }
+
             .control {
                 margin-top: 15px;
+                width: 100%;
+                font-size: 2em;
+            }
+            .control input {
+                width: 100%;
             }
         </style>
         <div id="click-area">
