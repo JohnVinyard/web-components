@@ -1,3 +1,4 @@
+// TODO: for-loop and out parameter
 const elementwiseDifference = (
     a: Float32Array,
     b: Float32Array
@@ -5,6 +6,7 @@ const elementwiseDifference = (
     return a.map((x, i) => x - b[i]);
 };
 
+// TODO: for-loop and out parameter
 const elementwiseAdd = (a: Float32Array, b: Float32Array): Float32Array => {
     return a.map((x, i) => x + b[i]);
 };
@@ -13,10 +15,12 @@ const zerosLike = (x: Float32Array): Float32Array => {
     return new Float32Array(x.length).fill(0);
 };
 
+// TODO: re-implement as for-loop
 const vectorSum = (vec: Float32Array): number => {
     return vec.reduce((accum, current) => accum + current, 0);
 };
 
+// TODO: for-loop and out parameter
 const vectorScalarDivide = (
     vec: Float32Array,
     scalar: number
@@ -24,6 +28,7 @@ const vectorScalarDivide = (
     return vec.map((x) => x / scalar);
 };
 
+// TODO: for-loop and out parameter
 const vectorScalarMultiply = (
     vec: Float32Array,
     scalar: number
@@ -62,6 +67,7 @@ class Mass {
     private acceleration: Float32Array = null;
     private velocity: Float32Array = null;
 
+    // TODO: damping should be a single value Float32Array
     constructor(
         public readonly id: string,
         public position: Float32Array,
@@ -74,10 +80,13 @@ class Mass {
         this.velocity = zerosLike(position);
     }
 
+    // TODO: this allocates a new array each time.  Create a diff
+    // instance variable, update and return it here
     public get diff(): Float32Array {
         return elementwiseDifference(this.position, this.origPosition);
     }
 
+    // TODO: This allocates a new array each time, update acceleration in place
     public applyForce(force: Float32Array) {
         this.acceleration = elementwiseAdd(
             this.acceleration,
@@ -85,10 +94,12 @@ class Mass {
         );
     }
 
+    // TODO: This allocates a new array each time, update velocity in place
     public updateVelocity() {
         this.velocity = elementwiseAdd(this.velocity, this.acceleration);
     }
 
+    // TODO: This allocates a new array each time, update in place
     public updatePosition() {
         if (this.fixed) {
             return;
@@ -97,6 +108,7 @@ class Mass {
         this.position = elementwiseAdd(this.position, this.velocity);
     }
 
+    // TODO: This allocates a new array each time, update velocity in place
     public clear() {
         this.velocity = vectorScalarMultiply(this.velocity, this.damping);
         this.acceleration = this.acceleration.fill(0);
@@ -107,6 +119,7 @@ class Spring {
     private m1Resting: Float32Array;
     private m2Resting: Float32Array;
 
+    // TODO: tension should be a single-value, Float32Array
     constructor(public m1: Mass, public m2: Mass, public tension: number) {
         this.m1Resting = elementwiseDifference(m1.position, m2.position);
         this.m2Resting = elementwiseDifference(m2.position, m1.position);
@@ -115,6 +128,11 @@ class Spring {
     public get masses(): Mass[] {
         return [this.m2, this.m2];
     }
+
+    // TODO: current and c2 should be symmetric, thereforce, I should be able to just
+    // invert the sign, I think?
+
+    // TODO: private instance variable scratchpad for current and c2 to avoid memory allocation
 
     public updateForces() {
         // compute for m1
@@ -212,15 +230,22 @@ class SpringMesh {
     public simulationStep(force: Force | null): number {
         if (force !== null) {
             const nearest = this.findNearestMass(force);
-            console.log('NEAREST', nearest);
             nearest.applyForce(force.force);
         }
 
+        // TODO: update forces needs to happen at once, but everything after that only depends
+        // on the forces already applied, so could be collapsed into a single loop.  Right now,
+        // this loops over all masses four times in total.  We only need two passes.
         this.updateForces();
+
+        // TODO: Collapse into single pass with for loop
         this.updateVelocities();
         this.updatePositions();
         this.clear();
 
+        // TODO: This could be an instance variable stored on the mass at the
+        // end of each simulation step.  It could be returned at the end of the second
+        // pass
         const outputSample: number = this.masses.reduce((accum, mass) => {
             return accum + el1Norm(mass.diff);
         }, 0);
@@ -228,32 +253,6 @@ class SpringMesh {
         return outputSample;
     }
 }
-
-/**
- * def build_string():
-    mass = 10
-    tension = 0.9
-    damping = 0.9998
-    n_masses = 100
-
-    x_pos = np.linspace(0, 1, num=n_masses)
-    positions = np.zeros((n_masses, 3))
-    positions[:, 0] = x_pos
-
-    masses = [
-        Mass(str(i), pos, mass, damping, fixed=i == 0 or i == n_masses - 1)
-        for i, pos in enumerate(positions)
-    ]
-
-    springs = [
-        Spring(masses[i], masses[i + 1], tension)
-        for i in range(n_masses - 1)
-    ]
-
-    mesh = SpringMesh(springs)
-    return mesh
-
- */
 
 const buildString = (
     mass: number = 10,
@@ -345,12 +344,17 @@ class Physical extends AudioWorkletProcessor {
 
         const nSteps = left.length;
 
+        // TODO: remove this, temporarily, to see if it affects the number
+        // of nodes I can compute
         const f: ForceInjectionEvent | undefined = this.eventQueue.shift();
 
+        // TODO: Write directly to left, rather than allocating memory here
         const output: Float32Array = new Float32Array(nSteps);
 
         for (let i = 0; i < nSteps; i++) {
             if (i === 0 && f !== undefined) {
+                // TODO: don't allocate this at all, or make it a mutable instance
+                // variable
                 const frce = new Force(f.location, f.force);
                 output[i] = this.mesh.simulationStep(frce);
             } else {
