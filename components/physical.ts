@@ -209,26 +209,17 @@ class SpringMesh {
         }
     }
 
-    public updateVelocities() {
+    public secondPass() {
         for (const mass of this.masses) {
             mass.updateVelocity();
-        }
-    }
-
-    public updatePositions() {
-        for (const mass of this.masses) {
             mass.updatePosition();
-        }
-    }
-
-    public clear() {
-        for (const mass of this.masses) {
             mass.clear();
         }
     }
 
     public simulationStep(force: Force | null): number {
         if (force !== null) {
+            // compute any force applied from outside the system
             const nearest = this.findNearestMass(force);
             nearest.applyForce(force.force);
         }
@@ -238,10 +229,7 @@ class SpringMesh {
         // this loops over all masses four times in total.  We only need two passes.
         this.updateForces();
 
-        // TODO: Collapse into single pass with for loop
-        this.updateVelocities();
-        this.updatePositions();
-        this.clear();
+        this.secondPass();
 
         // TODO: This could be an instance variable stored on the mass at the
         // end of each simulation step.  It could be returned at the end of the second
@@ -348,23 +336,20 @@ class Physical extends AudioWorkletProcessor {
         // of nodes I can compute
         const f: ForceInjectionEvent | undefined = this.eventQueue.shift();
 
-        // TODO: Write directly to left, rather than allocating memory here
-        const output: Float32Array = new Float32Array(nSteps);
-
         for (let i = 0; i < nSteps; i++) {
             if (i === 0 && f !== undefined) {
                 // TODO: don't allocate this at all, or make it a mutable instance
                 // variable
                 const frce = new Force(f.location, f.force);
-                output[i] = this.mesh.simulationStep(frce);
+                left[i] = this.mesh.simulationStep(frce);
             } else {
-                output[i] = this.mesh.simulationStep(null);
+                left[i] = this.mesh.simulationStep(null);
             }
             this.samplesComputed += 1;
         }
 
-        left.set(output);
-
+        // TODO: Is it possible to remove this from the process loop
+        // by making it a private async instance method?
         if (this.samplesComputed % 1024 === 0) {
             this.port.postMessage(this.mesh.toMeshInfo());
         }
