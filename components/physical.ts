@@ -20,20 +20,24 @@ const vectorSum = (vec: Float32Array): number => {
     return vec.reduce((accum, current) => accum + current, 0);
 };
 
-// TODO: for-loop and out parameter
 const vectorScalarDivide = (
     vec: Float32Array,
     scalar: number
 ): Float32Array => {
-    return vec.map((x) => x / scalar);
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] / scalar;
+    }
+    return vec;
 };
 
-// TODO: for-loop and out parameter
 const vectorScalarMultiply = (
     vec: Float32Array,
     scalar: number
 ): Float32Array => {
-    return vec.map((x) => x * scalar);
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] * scalar;
+    }
+    return vec;
 };
 
 const l2Norm = (vec: Float32Array): number => {

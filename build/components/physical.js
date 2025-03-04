@@ -13,13 +13,17 @@ const zerosLike = (x) => {
 const vectorSum = (vec) => {
     return vec.reduce((accum, current) => accum + current, 0);
 };
-// TODO: for-loop and out parameter
 const vectorScalarDivide = (vec, scalar) => {
-    return vec.map((x) => x / scalar);
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] / scalar;
+    }
+    return vec;
 };
-// TODO: for-loop and out parameter
 const vectorScalarMultiply = (vec, scalar) => {
-    return vec.map((x) => x * scalar);
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] * scalar;
+    }
+    return vec;
 };
 const l2Norm = (vec) => {
     const squared = vec.map((x) => Math.pow(x, 2));
@@ -161,21 +165,6 @@ class SpringMesh {
             mass.clear();
         }
     }
-    // public updateVelocities() {
-    //     for (const mass of this.masses) {
-    //         mass.updateVelocity();
-    //     }
-    // }
-    // public updatePositions() {
-    //     for (const mass of this.masses) {
-    //         mass.updatePosition();
-    //     }
-    // }
-    // public clear() {
-    //     for (const mass of this.masses) {
-    //         mass.clear();
-    //     }
-    // }
     simulationStep(force) {
         if (force !== null) {
             // compute any force applied from outside the system
@@ -186,11 +175,7 @@ class SpringMesh {
         // on the forces already applied, so could be collapsed into a single loop.  Right now,
         // this loops over all masses four times in total.  We only need two passes.
         this.updateForces();
-        // TODO: Collapse into single pass with for loop
         this.secondPass();
-        // this.updateVelocities();
-        // this.updatePositions();
-        // this.clear();
         // TODO: This could be an instance variable stored on the mass at the
         // end of each simulation step.  It could be returned at the end of the second
         // pass
