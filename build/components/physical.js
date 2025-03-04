@@ -1,8 +1,6 @@
 // TODO: for-loop and out parameter
-const elementwiseDifference = (a, b
-// out: Float32Array
-) => {
-    const out = zerosLike(a);
+const elementwiseDifference = (a, b, out) => {
+    // const out = zerosLike(a);
     // return a.map((x, i) => x - b[i]);
     for (let i = 0; i < a.length; i++) {
         out[i] = a[i] - b[i];
@@ -10,10 +8,8 @@ const elementwiseDifference = (a, b
     return out;
 };
 // TODO: for-loop and out parameter
-const elementwiseAdd = (a, b
-// out: Float32Array
-) => {
-    const out = zerosLike(a);
+const elementwiseAdd = (a, b, out) => {
+    // const out = zerosLike(a);
     // return a.map((x, i) => x + b[i]);
     for (let i = 0; i < a.length; i++) {
         out[i] = a[i] + b[i];
@@ -100,24 +96,24 @@ class Mass {
     }
     // TODO: This allocates a new array each time, update acceleration in place
     applyForce(force) {
-        this.acceleration = elementwiseAdd(this.acceleration, vectorScalarDivide(force, this.mass));
+        this.acceleration = elementwiseAdd(this.acceleration, vectorScalarDivide(force, this.mass), this.acceleration);
     }
     // TODO: This allocates a new array each time, update velocity in place
     updateVelocity() {
-        this.velocity = elementwiseAdd(this.velocity, this.acceleration);
+        this.velocity = elementwiseAdd(this.velocity, this.acceleration, this.velocity);
     }
     // TODO: This allocates a new array each time, update in place
     updatePosition() {
         if (this.fixed) {
             return;
         }
-        this.position = elementwiseAdd(this.position, this.velocity);
+        this.position = elementwiseAdd(this.position, this.velocity, this.position);
     }
     // TODO: This allocates a new array each time, update velocity in place
     clear() {
         this.velocity = vectorScalarMultiply(this.velocity, this.damping);
         this.acceleration = this.acceleration.fill(0);
-        this._diff = elementwiseDifference(this.position, this.origPosition);
+        this._diff = elementwiseDifference(this.position, this.origPosition, this._diff);
     }
 }
 class Spring {
@@ -126,8 +122,9 @@ class Spring {
         this.m1 = m1;
         this.m2 = m2;
         this.tension = tension;
-        this.m1Resting = elementwiseDifference(m1.position, m2.position);
-        this.m2Resting = elementwiseDifference(m2.position, m1.position);
+        this.m1Resting = elementwiseDifference(m1.position, m2.position, zerosLike(m1.position));
+        this.m2Resting = elementwiseDifference(m2.position, m1.position, zerosLike(m1.position));
+        this.scratchpad = zerosLike(m1.position);
     }
     get masses() {
         return [this.m2, this.m2];
@@ -137,12 +134,12 @@ class Spring {
     // TODO: private instance variable scratchpad for current and c2 to avoid memory allocation
     updateForces() {
         // compute for m1
-        const current = elementwiseDifference(this.m1.position, this.m2.position);
-        const displacement = elementwiseDifference(this.m1Resting, current);
+        const current = elementwiseDifference(this.m1.position, this.m2.position, this.scratchpad);
+        const displacement = elementwiseDifference(this.m1Resting, current, this.scratchpad);
         this.m1.applyForce(vectorScalarMultiply(displacement, this.tension));
         // compute for m2
-        const c2 = elementwiseDifference(this.m2.position, this.m1.position);
-        const d2 = elementwiseDifference(this.m2Resting, c2);
+        const c2 = elementwiseDifference(this.m2.position, this.m1.position, this.scratchpad);
+        const d2 = elementwiseDifference(this.m2Resting, c2, this.scratchpad);
         this.m2.applyForce(vectorScalarMultiply(d2, this.tension));
     }
 }
@@ -214,11 +211,11 @@ class SpringMesh {
         for (let i = 0; i < this.masses.length; i++) {
             outputSample += el1Norm(this.masses[i].diff);
         }
-        return outputSample;
+        return Math.tanh(outputSample);
     }
 }
-const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 32) => {
-    // Create the masses
+const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 64) => {
+    // Create the masses256
     let masses = [];
     for (let i = 0; i < nMasses; i++) {
         const newMass = new Mass(i.toString(), new Float32Array([0, i / nMasses]), mass, damping, i === 0 || i === nMasses - 1);
