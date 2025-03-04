@@ -83,7 +83,7 @@ export class PhysicalStringSimulation extends HTMLElement {
             />
         </div>
         <div class="control">
-            <label for="damping-slider">Damping</label>
+            <label for="damping-slider">Resonance</label>
             <input 
                 type="range" 
                 name="damping-slider" 

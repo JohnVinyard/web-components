@@ -11,7 +11,12 @@ const zerosLike = (x) => {
 };
 // TODO: re-implement as for-loop
 const vectorSum = (vec) => {
-    return vec.reduce((accum, current) => accum + current, 0);
+    // return vec.reduce((accum, current) => accum + current, 0);
+    let total = 0;
+    for (let i = 0; i < vec.length; i++) {
+        total += vec[i];
+    }
+    return total;
 };
 const vectorScalarDivide = (vec, scalar) => {
     for (let i = 0; i < vec.length; i++) {
@@ -26,15 +31,27 @@ const vectorScalarMultiply = (vec, scalar) => {
     return vec;
 };
 const l2Norm = (vec) => {
-    const squared = vec.map((x) => Math.pow(x, 2));
-    return Math.sqrt(vectorSum(squared));
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) {
+        norm += Math.pow(vec[i], 2);
+    }
+    return Math.sqrt(norm);
 };
 const el1Norm = (vec) => {
-    return vectorSum(vec.map(Math.abs));
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) {
+        norm += Math.abs(vec[i]);
+    }
+    return norm;
 };
 const distance = (a, b) => {
-    const diff = elementwiseDifference(a, b);
-    return l2Norm(diff);
+    // const diff = elementwiseDifference(a, b);
+    // return l2Norm(diff);
+    let distance = 0;
+    for (let i = 0; i < a.length; i++) {
+        distance += Math.pow((a[i] - b[i]), 2);
+    }
+    return Math.sqrt(distance);
 };
 const clamp = (value, min, max) => {
     if (value < min) {
@@ -176,16 +193,14 @@ class SpringMesh {
         // this loops over all masses four times in total.  We only need two passes.
         this.updateForces();
         this.secondPass();
-        // TODO: This could be an instance variable stored on the mass at the
-        // end of each simulation step.  It could be returned at the end of the second
-        // pass
-        const outputSample = this.masses.reduce((accum, mass) => {
-            return accum + el1Norm(mass.diff);
-        }, 0);
+        let outputSample = 0;
+        for (let i = 0; i < this.masses.length; i++) {
+            outputSample += el1Norm(this.masses[i].diff);
+        }
         return outputSample;
     }
 }
-const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 16) => {
+const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 32) => {
     // Create the masses
     let masses = [];
     for (let i = 0; i < nMasses; i++) {

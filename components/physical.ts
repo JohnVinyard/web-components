@@ -17,7 +17,12 @@ const zerosLike = (x: Float32Array): Float32Array => {
 
 // TODO: re-implement as for-loop
 const vectorSum = (vec: Float32Array): number => {
-    return vec.reduce((accum, current) => accum + current, 0);
+    // return vec.reduce((accum, current) => accum + current, 0);
+    let total = 0;
+    for (let i = 0; i < vec.length; i++) {
+        total += vec[i];
+    }
+    return total;
 };
 
 const vectorScalarDivide = (
@@ -41,17 +46,29 @@ const vectorScalarMultiply = (
 };
 
 const l2Norm = (vec: Float32Array): number => {
-    const squared = vec.map((x) => x ** 2);
-    return Math.sqrt(vectorSum(squared));
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) {
+        norm += vec[i] ** 2;
+    }
+    return Math.sqrt(norm);
 };
 
 const el1Norm = (vec: Float32Array): number => {
-    return vectorSum(vec.map(Math.abs));
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) {
+        norm += Math.abs(vec[i]);
+    }
+    return norm;
 };
 
 const distance = (a: Float32Array, b: Float32Array): number => {
-    const diff = elementwiseDifference(a, b);
-    return l2Norm(diff);
+    // const diff = elementwiseDifference(a, b);
+    // return l2Norm(diff);
+    let distance = 0;
+    for (let i = 0; i < a.length; i++) {
+        distance += (a[i] - b[i]) ** 2;
+    }
+    return Math.sqrt(distance);
 };
 
 const clamp = (value: number, min: number, max: number): number => {
@@ -69,7 +86,7 @@ const clamp = (value: number, min: number, max: number): number => {
 class Mass {
     private origPosition: Float32Array = null;
     private acceleration: Float32Array = null;
-    private velocity: Float32Array = null;
+    public velocity: Float32Array = null;
 
     // TODO: damping should be a single value Float32Array
     constructor(
@@ -235,12 +252,10 @@ class SpringMesh {
 
         this.secondPass();
 
-        // TODO: This could be an instance variable stored on the mass at the
-        // end of each simulation step.  It could be returned at the end of the second
-        // pass
-        const outputSample: number = this.masses.reduce((accum, mass) => {
-            return accum + el1Norm(mass.diff);
-        }, 0);
+        let outputSample = 0;
+        for (let i = 0; i < this.masses.length; i++) {
+            outputSample += el1Norm(this.masses[i].diff);
+        }
 
         return outputSample;
     }
@@ -250,7 +265,7 @@ const buildString = (
     mass: number = 10,
     tension: number = 0.5,
     damping: number = 0.9998,
-    nMasses: number = 16
+    nMasses: number = 32
 ): SpringMesh => {
     // Create the masses
 
