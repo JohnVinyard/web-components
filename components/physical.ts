@@ -2,13 +2,28 @@
 const elementwiseDifference = (
     a: Float32Array,
     b: Float32Array
+    // out: Float32Array
 ): Float32Array => {
-    return a.map((x, i) => x - b[i]);
+    const out = zerosLike(a);
+    // return a.map((x, i) => x - b[i]);
+    for (let i = 0; i < a.length; i++) {
+        out[i] = a[i] - b[i];
+    }
+    return out;
 };
 
 // TODO: for-loop and out parameter
-const elementwiseAdd = (a: Float32Array, b: Float32Array): Float32Array => {
-    return a.map((x, i) => x + b[i]);
+const elementwiseAdd = (
+    a: Float32Array,
+    b: Float32Array
+    // out: Float32Array
+): Float32Array => {
+    const out = zerosLike(a);
+    // return a.map((x, i) => x + b[i]);
+    for (let i = 0; i < a.length; i++) {
+        out[i] = a[i] + b[i];
+    }
+    return out;
 };
 
 const zerosLike = (x: Float32Array): Float32Array => {
@@ -87,6 +102,7 @@ class Mass {
     private origPosition: Float32Array = null;
     private acceleration: Float32Array = null;
     public velocity: Float32Array = null;
+    public _diff: Float32Array = null;
 
     // TODO: damping should be a single value Float32Array
     constructor(
@@ -99,12 +115,13 @@ class Mass {
         this.origPosition = new Float32Array(position);
         this.acceleration = zerosLike(position);
         this.velocity = zerosLike(position);
+        this._diff = zerosLike(position);
     }
 
     // TODO: this allocates a new array each time.  Create a diff
     // instance variable, update and return it here
     public get diff(): Float32Array {
-        return elementwiseDifference(this.position, this.origPosition);
+        return this._diff;
     }
 
     // TODO: This allocates a new array each time, update acceleration in place
@@ -133,6 +150,7 @@ class Mass {
     public clear() {
         this.velocity = vectorScalarMultiply(this.velocity, this.damping);
         this.acceleration = this.acceleration.fill(0);
+        this._diff = elementwiseDifference(this.position, this.origPosition);
     }
 }
 

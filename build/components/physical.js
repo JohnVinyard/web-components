@@ -1,10 +1,24 @@
 // TODO: for-loop and out parameter
-const elementwiseDifference = (a, b) => {
-    return a.map((x, i) => x - b[i]);
+const elementwiseDifference = (a, b
+// out: Float32Array
+) => {
+    const out = zerosLike(a);
+    // return a.map((x, i) => x - b[i]);
+    for (let i = 0; i < a.length; i++) {
+        out[i] = a[i] - b[i];
+    }
+    return out;
 };
 // TODO: for-loop and out parameter
-const elementwiseAdd = (a, b) => {
-    return a.map((x, i) => x + b[i]);
+const elementwiseAdd = (a, b
+// out: Float32Array
+) => {
+    const out = zerosLike(a);
+    // return a.map((x, i) => x + b[i]);
+    for (let i = 0; i < a.length; i++) {
+        out[i] = a[i] + b[i];
+    }
+    return out;
 };
 const zerosLike = (x) => {
     return new Float32Array(x.length).fill(0);
@@ -73,14 +87,16 @@ class Mass {
         this.origPosition = null;
         this.acceleration = null;
         this.velocity = null;
+        this._diff = null;
         this.origPosition = new Float32Array(position);
         this.acceleration = zerosLike(position);
         this.velocity = zerosLike(position);
+        this._diff = zerosLike(position);
     }
     // TODO: this allocates a new array each time.  Create a diff
     // instance variable, update and return it here
     get diff() {
-        return elementwiseDifference(this.position, this.origPosition);
+        return this._diff;
     }
     // TODO: This allocates a new array each time, update acceleration in place
     applyForce(force) {
@@ -101,6 +117,7 @@ class Mass {
     clear() {
         this.velocity = vectorScalarMultiply(this.velocity, this.damping);
         this.acceleration = this.acceleration.fill(0);
+        this._diff = elementwiseDifference(this.position, this.origPosition);
     }
 }
 class Spring {
