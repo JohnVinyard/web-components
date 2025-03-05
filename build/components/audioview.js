@@ -46,7 +46,7 @@ const fetchBinary = (url) => __awaiter(void 0, void 0, void 0, function* () {
     return resp.arrayBuffer();
 });
 const audioCache = {};
-const fetchAudio = (url, context) => __awaiter(void 0, void 0, void 0, function* () {
+export const fetchAudio = (url, context) => __awaiter(void 0, void 0, void 0, function* () {
     const cached = audioCache[url];
     if (cached !== undefined) {
         return cached;

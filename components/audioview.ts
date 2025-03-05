@@ -56,7 +56,7 @@ const fetchBinary = async (url: string): Promise<ArrayBuffer> => {
 
 const audioCache = {};
 
-const fetchAudio = async (
+export const fetchAudio = async (
     url: string,
     context: AudioContext
 ): Promise<AudioBuffer> => {

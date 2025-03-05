@@ -1,4 +1,4 @@
-import { playAudio, context } from './audioview';
+import { playAudio, context, fetchAudio } from './audioview';
 
 interface Event {
     eventTime: number;
@@ -141,6 +141,23 @@ export class AudioTimeline extends HTMLElement {
         this[property] = newValue;
 
         if (AudioTimeline.observedAttributes.some((x) => x === property)) {
+            if (property === 'events') {
+                Promise.all(
+                    this.eventData.map(({ audioUrl }) => {
+                        return fetchAudio(audioUrl, context);
+                    })
+                ).then((results) => {
+                    const event = new CustomEvent('audio-view-loaded', {
+                        bubbles: true,
+                        cancelable: true,
+                        detail: {
+                            timeline: true,
+                        },
+                    });
+                    this.dispatchEvent(event);
+                });
+            }
+
             this.render();
         }
     }
