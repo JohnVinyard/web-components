@@ -404,6 +404,7 @@ export class AudioView extends HTMLElement {
             startSeconds,
             duration
         );
+
         this.isPlaying = true;
 
         const audioView = this.shadowRoot.querySelector('.audio-view-control');
@@ -453,6 +454,12 @@ export class AudioView extends HTMLElement {
             fetchAudio(newValue, context).then((buf) => {
                 this.buffer = buf;
                 this.render();
+                const loadedEvent = new CustomEvent('audio-view-loaded', {
+                    bubbles: true,
+                    cancelable: true,
+                    detail: { url: this.src },
+                });
+                this.dispatchEvent(loadedEvent);
             });
             return;
         }
