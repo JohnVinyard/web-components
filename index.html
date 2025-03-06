@@ -22,6 +22,10 @@
         <script type="text/javascript">
             document.addEventListener('audio-view-loaded', (event) => {
                 console.log('LOADED', event);
+            });
+
+            document.addEventListener('audio-view-played', (event) => {
+                console.log('PLAYED', event);
             })
         </script>
         

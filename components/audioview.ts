@@ -397,6 +397,17 @@ export class AudioView extends HTMLElement {
                 ? this.currentEndTimeSeconds - startSeconds
                 : durationSeconds;
 
+        const playedEvent = new CustomEvent('audio-view-played', {
+            cancelable: true,
+            bubbles: true,
+            detail: {
+                url,
+                startSeconds,
+                durationSeconds,
+            },
+        });
+        this.dispatchEvent(playedEvent);
+
         // start at second 1 and play for 5 seconds
         this.playingBuffer = await playAudio(
             url,

@@ -74,6 +74,16 @@ export class AudioTimeline extends HTMLElement {
             element.addEventListener('click', (evt) => {
                 evt.stopPropagation();
                 const event = events[index];
+                const playedEvent = new CustomEvent('audio-view-played', {
+                    cancelable: true,
+                    bubbles: true,
+                    detail: {
+                        url: event.audioUrl,
+                        startSeconds: event.offset,
+                        durationSeconds: event.eventDuration,
+                    },
+                });
+                this.dispatchEvent(playedEvent);
                 playAudio(event.audioUrl, context, event.offset, event.eventDuration);
             });
         });
