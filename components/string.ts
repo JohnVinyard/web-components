@@ -19,14 +19,24 @@ interface MassInfo {
     position: Float32Array;
 }
 
-interface MeshInfo {
-    masses: MassInfo[];
+interface SpringInfo {
+    m1: Float32Array;
+    m2: Float32Array;
 }
 
-type CommunicationEvent =
-    | ForceInjectionEvent
-    | AdjustParameterEvent
-    | ChangeModelTypeEvent;
+interface MeshInfo {
+    masses: MassInfo[];
+    springs: SpringInfo[];
+    struck: Float32Array | null;
+}
+
+const pointsEqual = (p1: Float32Array, p2: Float32Array): boolean => {
+    return p1[0] == p2[0] && p1[1] == p2[1];
+};
+// type CommunicationEvent =
+//     | ForceInjectionEvent
+//     | AdjustParameterEvent
+//     | ChangeModelTypeEvent;
 
 export class PhysicalStringSimulation extends HTMLElement {
     private initialized: boolean = false;
@@ -93,7 +103,7 @@ export class PhysicalStringSimulation extends HTMLElement {
         </div>
         <div class="control">
             <label for="model-type">Model Type</label>
-            <select name="model-type" id="model-type">
+            <select name="model-type" id="model-type" disabled>
                 <option value="string" selected>String</option>
                 <option value="plate">Plate</option>
                 <option value="random">Random</option>
@@ -146,6 +156,8 @@ export class PhysicalStringSimulation extends HTMLElement {
                 return;
             }
 
+            modelTypeSelect.disabled = false;
+
             const context = new AudioContext({
                 sampleRate: 22050,
                 latencyHint: 'interactive',
@@ -168,31 +180,49 @@ export class PhysicalStringSimulation extends HTMLElement {
             physicalStringSim.connect(context.destination);
 
             this.node.port.onmessage = (event: MessageEvent<MeshInfo>) => {
-                const height = clickArea.offsetHeight;
-                const middle = height / 2;
+                const { masses, springs, struck } = event.data;
 
-                const width = clickArea.offsetWidth;
+                const elements = masses.map(
+                    (m) => `<circle 
+                            cx="${m.position[1]}" 
+                            cy="${m.position[0]}" 
+                            fill="${
+                                event.data.struck &&
+                                pointsEqual(struck, m.position)
+                                    ? 'black'
+                                    : '#55aa44'
+                            }"
+                            r="0.01"></circle>`
+                );
 
-                clickArea.innerHTML = event.data.masses
-                    .map(
-                        (m) =>
-                            `<div 
-                                style="
-                                    top: ${height * m.position[0]}px; 
-                                    left: ${width * m.position[1]}px; 
-                                    width: 20px; 
-                                    height: 20px; 
-                                    background-color: #55aa44;
-                                    position: absolute;
-                                    border-radius: 10px;
-                                    -webkit-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.25);
-                                    -moz-box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.25);
-                                    box-shadow: 10px 10px 5px 0px rgba(0,0,0,0.25);
-                                "
-                                >
-                                </div>`
-                    )
-                    .join('\n');
+                const lines = springs.map(
+                    (s) => `
+                        <line 
+                            x1="${s.m1[1]}" 
+                            x2="${s.m2[1]}" 
+
+                            y1="${s.m1[0]}"
+                            y2="${s.m2[0]}" 
+                            stroke="#55aa44"
+                            strokeWidth="0.001"
+                            style="stroke-width: 0.001;"
+                            ></line>
+                        `
+                );
+
+                clickArea.innerHTML = `
+                    <svg 
+                        viewBox="0 0 1 1" 
+                        width="100%" 
+                        height="50vh" 
+                        style="background-color:transparent; pointer-events: none;"
+                        preserveAspectRatio="none"
+                    >
+
+                        ${elements}
+                        ${lines}
+                    </svg>
+                `;
             };
 
             this.initialized = true;
@@ -246,7 +276,8 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
-        const modelTypeSelect = shadow.getElementById('model-type');
+        const modelTypeSelect = shadow.getElementById('model-type') as HTMLInputElement;
+
         modelTypeSelect.addEventListener('change', (event: Event) => {
             const target = event.target as HTMLSelectElement;
             const newValue = target.value;
@@ -272,10 +303,9 @@ export class PhysicalStringSimulation extends HTMLElement {
         clickArea.addEventListener('click', async (event: MouseEvent) => {
             await initialize();
 
-            const clickedElement = event.target as HTMLDivElement;
-
-            const xPos = event.clientX / clickedElement.offsetWidth;
-            const yPos = event.clientY / clickedElement.offsetHeight;
+            const rect = clickArea.getBoundingClientRect();
+            const yPos = (event.pageX - rect.left) / rect.width;
+            const xPos = (event.pageY - rect.top) / rect.height;
 
             const currentModel = (modelTypeSelect as HTMLInputElement).value as
                 | 'string'
@@ -284,9 +314,9 @@ export class PhysicalStringSimulation extends HTMLElement {
 
             const force: ForceInjectionEvent = {
                 location:
-                    currentModel === 'plate'
+                    currentModel === 'plate' || currentModel === 'random'
                         ? new Float32Array([xPos, yPos])
-                        : new Float32Array([0, xPos]),
+                        : new Float32Array([0, yPos]),
                 force:
                     currentModel === 'plate' || currentModel === 'random'
                         ? new Float32Array([

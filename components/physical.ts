@@ -219,6 +219,7 @@ class Force {
 
 class SpringMesh {
     private readonly masses: Mass[];
+    private mostRecentMassContacted: Mass | null = null;
 
     constructor(private readonly springs: Spring[]) {
         this.masses = Object.values(
@@ -233,6 +234,11 @@ class SpringMesh {
     public toMeshInfo(): MeshInfo {
         return {
             masses: this.masses.map(({ position }) => ({ position })),
+            springs: this.springs.map(({ m1, m2 }) => ({
+                m1: m1.position,
+                m2: m2.position,
+            })),
+            struck: this.mostRecentMassContacted?.position ?? null,
         };
     }
 
@@ -257,13 +263,14 @@ class SpringMesh {
 
             const dist = distance(m.position, force.location);
 
-            if (dist < smallestDistance) {
+            if (dist < smallestDistance && !m.fixed) {
                 smallestDistance = dist;
                 closestMassIndex = i;
             }
         }
 
         const nearest = this.masses[closestMassIndex];
+        this.mostRecentMassContacted = nearest;
         return nearest;
     }
 
@@ -341,7 +348,7 @@ const buildPlate = (
     mass: number = 20,
     tension: number = 0.1,
     damping: number = 0.9998,
-    width: number = 6
+    width: number = 8
 ): SpringMesh => {
     const isBoundary = (index: number) => index === 0 || index === width - 1;
     const isOutOfBounds = (index: number) => index < 0 || index >= width;
@@ -379,6 +386,11 @@ const buildPlate = (
             for (let j = -1; j <= 1; j++) {
                 if (i === 0 && j === 0) {
                     // Don't connect to self
+                    continue;
+                }
+
+                if (Math.abs(i) + Math.abs(j) == 2) {
+                    // no diagonal connections
                     continue;
                 }
 
@@ -491,8 +503,15 @@ interface MassInfo {
     position: Float32Array;
 }
 
+interface SpringInfo {
+    m1: Float32Array;
+    m2: Float32Array;
+}
+
 interface MeshInfo {
     masses: MassInfo[];
+    springs: SpringInfo[];
+    struck: Float32Array | null;
 }
 
 class Physical extends AudioWorkletProcessor {

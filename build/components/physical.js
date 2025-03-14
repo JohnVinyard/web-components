@@ -143,6 +143,7 @@ class Force {
 class SpringMesh {
     constructor(springs) {
         this.springs = springs;
+        this.mostRecentMassContacted = null;
         this.masses = Object.values(springs.reduce((accum, current) => {
             accum[current.m1.id] = current.m1;
             accum[current.m2.id] = current.m2;
@@ -150,8 +151,14 @@ class SpringMesh {
         }, {}));
     }
     toMeshInfo() {
+        var _a, _b;
         return {
             masses: this.masses.map(({ position }) => ({ position })),
+            springs: this.springs.map(({ m1, m2 }) => ({
+                m1: m1.position,
+                m2: m2.position,
+            })),
+            struck: (_b = (_a = this.mostRecentMassContacted) === null || _a === void 0 ? void 0 : _a.position) !== null && _b !== void 0 ? _b : null,
         };
     }
     adjustTension(newTension) {
@@ -169,12 +176,13 @@ class SpringMesh {
         for (let i = 0; i < this.masses.length; i++) {
             const m = this.masses[i];
             const dist = distance(m.position, force.location);
-            if (dist < smallestDistance) {
+            if (dist < smallestDistance && !m.fixed) {
                 smallestDistance = dist;
                 closestMassIndex = i;
             }
         }
         const nearest = this.masses[closestMassIndex];
+        this.mostRecentMassContacted = nearest;
         return nearest;
     }
     updateForces() {
@@ -210,7 +218,10 @@ class SpringMesh {
 const buildRandom = (mass = 20, tension = 0.1, damping = 0.9998, nMasses = 64) => {
     const masses = [];
     for (let i = 0; i < nMasses; i++) {
-        const position = new Float32Array([Math.random(), Math.random()]);
+        const position = new Float32Array([
+            0.1 + Math.random() * 0.8,
+            0.1 + Math.random() * 0.8,
+        ]);
         const m = new Mass(i.toString(), position, mass, damping, Math.random() > 0.9);
         masses.push(m);
     }
@@ -223,7 +234,7 @@ const buildRandom = (mass = 20, tension = 0.1, damping = 0.9998, nMasses = 64) =
     }
     return new SpringMesh(springs);
 };
-const buildPlate = (mass = 20, tension = 0.1, damping = 0.9998, width = 6) => {
+const buildPlate = (mass = 20, tension = 0.1, damping = 0.9998, width = 8) => {
     const isBoundary = (index) => index === 0 || index === width - 1;
     const isOutOfBounds = (index) => index < 0 || index >= width;
     const makeKey = ([i, j]) => `${i}_${j}`;
@@ -246,6 +257,10 @@ const buildPlate = (mass = 20, tension = 0.1, damping = 0.9998, width = 6) => {
             for (let j = -1; j <= 1; j++) {
                 if (i === 0 && j === 0) {
                     // Don't connect to self
+                    continue;
+                }
+                if (Math.abs(i) + Math.abs(j) == 2) {
+                    // no diagonal connections
                     continue;
                 }
                 const newX = x + i;
