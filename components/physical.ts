@@ -4,8 +4,6 @@ const elementwiseDifference = (
     b: Float32Array,
     out: Float32Array
 ): Float32Array => {
-    // const out = zerosLike(a);
-    // return a.map((x, i) => x - b[i]);
     for (let i = 0; i < a.length; i++) {
         out[i] = a[i] - b[i];
     }
@@ -18,8 +16,6 @@ const elementwiseAdd = (
     b: Float32Array,
     out: Float32Array
 ): Float32Array => {
-    // const out = zerosLike(a);
-    // return a.map((x, i) => x + b[i]);
     for (let i = 0; i < a.length; i++) {
         out[i] = a[i] + b[i];
     }
@@ -77,8 +73,6 @@ const el1Norm = (vec: Float32Array): number => {
 };
 
 const distance = (a: Float32Array, b: Float32Array): number => {
-    // const diff = elementwiseDifference(a, b);
-    // return l2Norm(diff);
     let distance = 0;
     for (let i = 0; i < a.length; i++) {
         distance += (a[i] - b[i]) ** 2;
@@ -191,11 +185,6 @@ class Spring {
         return [this.m2, this.m2];
     }
 
-    // TODO: current and c2 should be symmetric, thereforce, I should be able to just
-    // invert the sign, I think?
-
-    // TODO: private instance variable scratchpad for current and c2 to avoid memory allocation
-
     public updateForces() {
         // compute for m1
         const current = elementwiseDifference(
@@ -263,15 +252,19 @@ class SpringMesh {
         let smallestDistance = Number.MAX_VALUE;
         let closestMassIndex = -1;
 
-        this.masses.forEach((m, index) => {
+        for (let i = 0; i < this.masses.length; i++) {
+            const m = this.masses[i];
+
             const dist = distance(m.position, force.location);
+
             if (dist < smallestDistance) {
                 smallestDistance = dist;
-                closestMassIndex = index;
+                closestMassIndex = i;
             }
-        });
+        }
 
-        return this.masses[closestMassIndex];
+        const nearest = this.masses[closestMassIndex];
+        return nearest;
     }
 
     public updateForces() {
@@ -304,12 +297,143 @@ class SpringMesh {
 
         let outputSample = 0;
         for (let i = 0; i < this.masses.length; i++) {
-            outputSample += el1Norm(this.masses[i].diff);
+            outputSample += this.masses[i].diff[0];
         }
 
         return Math.tanh(outputSample);
     }
 }
+
+const buildRandom = (
+    mass: number = 20,
+    tension: number = 0.1,
+    damping: number = 0.9998,
+    nMasses: number = 64
+): SpringMesh => {
+    const masses: Mass[] = [];
+    for (let i = 0; i < nMasses; i++) {
+        const position = new Float32Array([
+            0.1 + Math.random() * 0.8,
+            0.1 + Math.random() * 0.8,
+        ]);
+        const m = new Mass(
+            i.toString(),
+            position,
+            mass,
+            damping,
+            Math.random() > 0.9
+        );
+        masses.push(m);
+    }
+
+    const springs: Spring[] = [];
+    for (let i = 0; i < nMasses * 2; i++) {
+        const m1 = masses[Math.floor(Math.random() * nMasses)];
+        const m2 = masses[Math.floor(Math.random() * nMasses)];
+        const spring = new Spring(m1, m2, tension);
+        springs.push(spring);
+    }
+
+    return new SpringMesh(springs);
+};
+
+const buildPlate = (
+    mass: number = 20,
+    tension: number = 0.1,
+    damping: number = 0.9998,
+    width: number = 6
+): SpringMesh => {
+    const isBoundary = (index: number) => index === 0 || index === width - 1;
+    const isOutOfBounds = (index: number) => index < 0 || index >= width;
+
+    const makeKey = ([i, j]: [number, number]) => `${i}_${j}`;
+    const parseKey = (key: string): [number, number] =>
+        key.split('_').map((x) => parseInt(x)) as [number, number];
+
+    function* iterPositions(): Generator<[number, number]> {
+        for (let i = 0; i < width; i++) {
+            for (let j = 0; j < width; j++) {
+                yield [i, j];
+            }
+        }
+    }
+
+    const masses: Record<string, Mass> = Array.from(iterPositions()).reduce(
+        (accum, [i, j]) => {
+            const newMass = new Mass(
+                makeKey([i, j]),
+                new Float32Array([i / width, j / width]),
+                mass,
+                damping,
+                isBoundary(i) || isBoundary(j)
+            );
+            const key = makeKey([i, j]);
+            accum[key] = newMass;
+            return accum;
+        },
+        {}
+    );
+
+    function* iterNeighbors(x: number, y: number): Generator<[number, number]> {
+        for (let i = -1; i <= 1; i++) {
+            for (let j = -1; j <= 1; j++) {
+                if (i === 0 && j === 0) {
+                    // Don't connect to self
+                    continue;
+                }
+
+                const newX = x + i;
+                const newY = y + j;
+
+                if (isOutOfBounds(newX) || isOutOfBounds(newY)) {
+                    // don't connect to out-of-bounds neighbors
+                    // that don't exist
+                    continue;
+                }
+
+                yield [newX, newY];
+            }
+        }
+    }
+
+    const existing: Set<string> = new Set<string>();
+
+    const springs: Spring[] = Object.values(masses).reduce(
+        (accum: Spring[], current: Mass) => {
+            const [x, y] = parseKey(current.id);
+            const newSprings: Spring[] = [];
+
+            Array.from(iterNeighbors(x, y)).forEach(([i, j]) => {
+                const currentKey: string = makeKey([x, y]);
+
+                const neighborKey: string = makeKey([i, j]);
+
+                // Springs are bi-directional, once we've built a connection,
+                // it does not need to be revisited
+                const s1: string = `${currentKey}_${neighborKey}`;
+                const s2: string = `${neighborKey}_${currentKey}`;
+                if (existing.has(s1) || existing.has(s2)) {
+                    return;
+                }
+
+                existing.add(s1);
+                existing.add(s2);
+
+                const neighborMass = masses[neighborKey];
+                console.log(
+                    `Connecting mass ${makeKey([i, j])} to mass ${neighborKey}`
+                );
+                newSprings.push(new Spring(current, neighborMass, tension));
+            });
+
+            return [...accum, ...newSprings];
+        },
+        []
+    );
+
+    const mesh = new SpringMesh(springs);
+    return mesh;
+};
 
 const buildString = (
     mass: number = 10,
@@ -317,13 +441,13 @@ const buildString = (
     damping: number = 0.9998,
     nMasses: number = 64
 ): SpringMesh => {
-    // Create the masses256
+    // Create the masses
 
     let masses: Mass[] = [];
     for (let i = 0; i < nMasses; i++) {
         const newMass = new Mass(
             i.toString(),
-            new Float32Array([0, i / nMasses]),
+            new Float32Array([0.5, i / nMasses]),
             mass,
             damping,
             i === 0 || i === nMasses - 1
@@ -353,6 +477,16 @@ interface AdjustParameterEvent {
     type: 'adjust-parameter';
 }
 
+interface ChangeModelTypeEvent {
+    value: 'string' | 'plate' | 'random';
+    type: 'model-type';
+}
+
+type CommunicationEvent =
+    | ForceInjectionEvent
+    | AdjustParameterEvent
+    | ChangeModelTypeEvent;
+
 interface MassInfo {
     position: Float32Array;
 }
@@ -360,8 +494,6 @@ interface MassInfo {
 interface MeshInfo {
     masses: MassInfo[];
 }
-
-type CommunicationEvent = ForceInjectionEvent | AdjustParameterEvent;
 
 class Physical extends AudioWorkletProcessor {
     private eventQueue: ForceInjectionEvent[] = [];
@@ -387,6 +519,17 @@ class Physical extends AudioWorkletProcessor {
                     this.mesh.adjustTension(value);
                 } else if (name === 'damping') {
                     this.mesh.adjustDamping(value);
+                }
+            } else if (event.data.type === 'model-type') {
+                const { value } = event.data;
+                if (value === 'plate') {
+                    this.mesh = buildPlate();
+                } else if (value === 'string') {
+                    this.mesh = buildString();
+                } else if (value === 'random') {
+                    this.mesh = buildRandom();
+                } else {
+                    throw new Error('Unsupported model type');
                 }
             }
         };

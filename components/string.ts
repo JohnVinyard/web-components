@@ -6,8 +6,13 @@ interface ForceInjectionEvent {
 
 interface AdjustParameterEvent {
     value: number;
-    name: 'tension' | 'mass' | 'damping';
+    name: 'tension' | 'mass' | 'damping' | 'model-type';
     type: 'adjust-parameter';
+}
+
+interface ChangeModelTypeEvent {
+    value: 'string' | 'plate' | 'random';
+    type: 'model-type';
 }
 
 interface MassInfo {
@@ -18,7 +23,10 @@ interface MeshInfo {
     masses: MassInfo[];
 }
 
-// type CommunicationEvent = ForceInjectionEvent | AdjustParameterEvent;
+type CommunicationEvent =
+    | ForceInjectionEvent
+    | AdjustParameterEvent
+    | ChangeModelTypeEvent;
 
 export class PhysicalStringSimulation extends HTMLElement {
     private initialized: boolean = false;
@@ -37,6 +45,10 @@ export class PhysicalStringSimulation extends HTMLElement {
 
         shadow.innerHTML = `
         <style>
+            body {
+                overflow: hidden;
+            }
+
             #click-area {
                 width: 100%;
                 height: 50vh;
@@ -65,14 +77,27 @@ export class PhysicalStringSimulation extends HTMLElement {
                 width: 60vw;
                 font-size: 2em;
             }
-            .control input {
+            .control input, .control select {
                 width: 100%;
+            }
+
+            select {
+                font-size: 1.2em;
+                padding: 5px;
             }
         </style>
         <div id="click-area">
             <div id="intro">
                 <h5>Click to Start</h5>
             </div>
+        </div>
+        <div class="control">
+            <label for="model-type">Model Type</label>
+            <select name="model-type" id="model-type">
+                <option value="string" selected>String</option>
+                <option value="plate">Plate</option>
+                <option value="random">Random</option>
+            </select>
         </div>
         <div class="control">
             <label for="tension-slider">Tension</label>
@@ -153,7 +178,7 @@ export class PhysicalStringSimulation extends HTMLElement {
                         (m) =>
                             `<div 
                                 style="
-                                    top: ${middle + height * m.position[0]}px; 
+                                    top: ${height * m.position[0]}px; 
                                     left: ${width * m.position[1]}px; 
                                     width: 20px; 
                                     height: 20px; 
@@ -173,7 +198,9 @@ export class PhysicalStringSimulation extends HTMLElement {
             this.initialized = true;
         };
 
-        const tensionSlider = shadow.getElementById('tension-slider');
+        const tensionSlider = shadow.getElementById(
+            'tension-slider'
+        ) as HTMLInputElement;
         tensionSlider.addEventListener('input', (event: Event) => {
             const target = event.target as HTMLInputElement;
             const newValue = parseFloat(target.value);
@@ -187,7 +214,9 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
-        const massSlider = shadow.getElementById('mass-slider');
+        const massSlider = shadow.getElementById(
+            'mass-slider'
+        ) as HTMLInputElement;
         massSlider.addEventListener('input', (event: Event) => {
             const target = event.target as HTMLInputElement;
             const newValue = parseFloat(target.value);
@@ -201,7 +230,9 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
-        const dampingSlider = shadow.getElementById('damping-slider');
+        const dampingSlider = shadow.getElementById(
+            'damping-slider'
+        ) as HTMLInputElement;
         dampingSlider.addEventListener('input', (event: Event) => {
             const target = event.target as HTMLInputElement;
             const newValue = parseFloat(target.value);
@@ -215,17 +246,54 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
+        const modelTypeSelect = shadow.getElementById('model-type');
+        modelTypeSelect.addEventListener('change', (event: Event) => {
+            const target = event.target as HTMLSelectElement;
+            const newValue = target.value;
+
+            if (this.node?.port) {
+                const message: ChangeModelTypeEvent = {
+                    type: 'model-type',
+                    value: newValue as 'string' | 'plate' | 'random',
+                };
+                this.node.port.postMessage(message);
+                if (newValue === 'string' || newValue === 'random') {
+                    massSlider.value = '10';
+                    tensionSlider.value = '0.5';
+                    dampingSlider.value = '0.9998';
+                } else if (newValue === 'plate') {
+                    massSlider.value = '20';
+                    tensionSlider.value = '0.1';
+                    dampingSlider.value = '0.9998';
+                }
+            }
+        });
+
         clickArea.addEventListener('click', async (event: MouseEvent) => {
             await initialize();
 
             const clickedElement = event.target as HTMLDivElement;
 
+            const xPos = event.clientX / clickedElement.offsetWidth;
+            const yPos = event.clientY / clickedElement.offsetHeight;
+
+            const currentModel = (modelTypeSelect as HTMLInputElement).value as
+                | 'string'
+                | 'plate'
+                | 'random';
+
             const force: ForceInjectionEvent = {
-                location: new Float32Array([
-                    0,
-                    event.clientX / clickedElement.offsetWidth,
-                ]),
-                force: new Float32Array([0.1 + Math.random() * 0.5, 0]),
+                location:
+                    currentModel === 'plate'
+                        ? new Float32Array([xPos, yPos])
+                        : new Float32Array([0, xPos]),
+                force:
+                    currentModel === 'plate' || currentModel === 'random'
+                        ? new Float32Array([
+                              Math.random() * 0.5,
+                              Math.random() * 0.5,
+                          ])
+                        : new Float32Array([0.1 + Math.random() * 0.5, 0]),
                 type: 'force-injection',
             };
 
