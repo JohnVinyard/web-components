@@ -6,10 +6,10 @@ export class AudioTimeline extends HTMLElement {
         this.duration = '';
         this.width = '';
         this.height = '';
-        this.playOnClick = 'true';
+        this.play = 'true';
     }
     get shouldPlayOnClick() {
-        return this.playOnClick.toLowerCase() === 'true';
+        return this.play.toLowerCase() === 'true';
     }
     get eventData() {
         const parsed = JSON.parse(this.events);
@@ -95,7 +95,7 @@ export class AudioTimeline extends HTMLElement {
         });
     }
     static get observedAttributes() {
-        return ['events', 'duration', 'width', 'height'];
+        return ['events', 'duration', 'width', 'height', 'play'];
     }
     attributeChangedCallback(property, oldValue, newValue) {
         if (newValue === oldValue) {

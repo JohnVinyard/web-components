@@ -15,7 +15,7 @@ export class AudioTimeline extends HTMLElement {
     public duration: string | null;
     public width: string | null;
     public height: string | null;
-    public playOnClick: string | null;
+    public play: string | null;
 
     constructor() {
         super();
@@ -23,11 +23,11 @@ export class AudioTimeline extends HTMLElement {
         this.duration = '';
         this.width = '';
         this.height = '';
-        this.playOnClick = 'true';
+        this.play = 'true';
     }
 
     public get shouldPlayOnClick(): boolean {
-        return this.playOnClick.toLowerCase() === 'true';
+        return this.play.toLowerCase() === 'true';
     }
 
     public get eventData(): Event[] {
@@ -144,7 +144,7 @@ export class AudioTimeline extends HTMLElement {
     }
 
     public static get observedAttributes(): (keyof AudioTimeline)[] {
-        return ['events', 'duration', 'width', 'height'];
+        return ['events', 'duration', 'width', 'height', 'play'];
     }
 
     public attributeChangedCallback(
