@@ -83,11 +83,10 @@ export class AudioTimeline extends HTMLElement {
                     cancelable: true,
                     bubbles: true,
                     detail: {
-                        // TODO: The event should include the scheduled time as well
                         url: event.audioUrl,
                         startSeconds: event.offset,
                         durationSeconds: event.eventDuration,
-                        eventTime: event.eventTime,
+                        eventTime: evt.timeStamp / 1000,
                     },
                 });
                 this.dispatchEvent(playedEvent);

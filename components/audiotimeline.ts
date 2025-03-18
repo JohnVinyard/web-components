@@ -1,20 +1,45 @@
 import { playAudio, context, fetchAudio } from './audioview';
 
 interface Event {
+    /**
+     * Time (in seconds) in the sequence timeline at which this event occurs
+     */
     eventTime: number;
+
+    /**
+     * Start offset (in seconds) when the sample should begin playing
+     */
+    offset: number;
+
+    /**
+     * Duration (in seconds) that the sample should play from the offset
+     */
     eventDuration?: number;
+
     eventEnvelope?: number[];
     audioUrl: string;
     color: string;
     y: number;
-    offset: number;
 }
 
 interface AudioPlayedEventDetails {
     url: string;
-    startSeconds?: number;
-    durationSeconds?: number;
+
+    /**
+     * Time (in seconds) that the event was played, not necessarily
+     * the same as its original position in the sequence
+     */
     eventTime: number;
+
+    /**
+     * Start offset (in seconds) when the sample should begin playing
+     */
+    startSeconds?: number;
+
+    /**
+     * Duration (in seconds) that the sample should play from the offset
+     */
+    durationSeconds?: number;
 }
 
 export class AudioTimeline extends HTMLElement {
@@ -135,11 +160,10 @@ export class AudioTimeline extends HTMLElement {
                         cancelable: true,
                         bubbles: true,
                         detail: {
-                            // TODO: The event should include the scheduled time as well
                             url: event.audioUrl,
                             startSeconds: event.offset,
                             durationSeconds: event.eventDuration,
-                            eventTime: event.eventTime,
+                            eventTime: evt.timeStamp / 1000,
                         },
                     }
                 );
