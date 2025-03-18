@@ -78,13 +78,17 @@ export class AudioTimeline extends HTMLElement {
             element.addEventListener('click', (evt) => {
                 evt.stopPropagation();
                 const event = events[index];
+                // console.log(events, index, event);
+                // TODO: Use generic form + type for event
                 const playedEvent = new CustomEvent('audio-view-played', {
                     cancelable: true,
                     bubbles: true,
                     detail: {
+                        // TODO: The event should include the scheduled time as well
                         url: event.audioUrl,
                         startSeconds: event.offset,
                         durationSeconds: event.eventDuration,
+                        eventTime: event.eventTime,
                     },
                 });
                 this.dispatchEvent(playedEvent);

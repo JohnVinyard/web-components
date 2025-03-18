@@ -10,6 +10,13 @@ interface Event {
     offset: number;
 }
 
+interface AudioPlayedEventDetails {
+    url: string;
+    startSeconds: number;
+    durationSeconds: number;
+    eventTime: number;
+}
+
 export class AudioTimeline extends HTMLElement {
     public events: string | null;
     public duration: string | null;
@@ -120,15 +127,21 @@ export class AudioTimeline extends HTMLElement {
                 evt.stopPropagation();
 
                 const event = events[index];
-                const playedEvent = new CustomEvent('audio-view-played', {
-                    cancelable: true,
-                    bubbles: true,
-                    detail: {
-                        url: event.audioUrl,
-                        startSeconds: event.offset,
-                        durationSeconds: event.eventDuration,
-                    },
-                });
+
+                const playedEvent = new CustomEvent<AudioPlayedEventDetails>(
+                    'audio-view-played',
+                    {
+                        cancelable: true,
+                        bubbles: true,
+                        detail: {
+                            // TODO: The event should include the scheduled time as well
+                            url: event.audioUrl,
+                            startSeconds: event.offset,
+                            durationSeconds: event.eventDuration,
+                            eventTime: event.eventTime,
+                        },
+                    }
+                );
                 this.dispatchEvent(playedEvent);
 
                 if (this.shouldPlayOnClick) {
