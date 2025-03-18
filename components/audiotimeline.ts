@@ -26,7 +26,7 @@ interface AudioPlayedEventDetails {
     url: string;
 
     /**
-     * Time (in seconds) that the event was played, not necessarily
+     * Time (in seconds) that the event was clicked, not necessarily
      * the same as its original position in the sequence
      */
     eventTime: number;
@@ -40,6 +40,12 @@ interface AudioPlayedEventDetails {
      * Duration (in seconds) that the sample should play from the offset
      */
     durationSeconds?: number;
+
+    /**
+     * Time in the original pattern that the event that was clicked
+     * occurred
+     */
+    patternStartTime: number;
 }
 
 export class AudioTimeline extends HTMLElement {
@@ -164,6 +170,7 @@ export class AudioTimeline extends HTMLElement {
                             startSeconds: event.offset,
                             durationSeconds: event.eventDuration,
                             eventTime: evt.timeStamp / 1000,
+                            patternStartTime: event.eventTime,
                         },
                     }
                 );

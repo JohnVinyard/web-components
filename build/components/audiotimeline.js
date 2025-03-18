@@ -87,6 +87,7 @@ export class AudioTimeline extends HTMLElement {
                         startSeconds: event.offset,
                         durationSeconds: event.eventDuration,
                         eventTime: evt.timeStamp / 1000,
+                        patternStartTime: event.eventTime,
                     },
                 });
                 this.dispatchEvent(playedEvent);
