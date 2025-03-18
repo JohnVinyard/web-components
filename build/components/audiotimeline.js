@@ -29,7 +29,8 @@ export class AudioTimeline extends HTMLElement {
         // establish bounds for x and y axes
         const events = this.eventData;
         const eventComponent = (event) => {
-            const step = event.eventDuration / event.eventEnvelope.length;
+            var _a;
+            const step = ((_a = event.eventDuration) !== null && _a !== void 0 ? _a : 0.5) / event.eventEnvelope.length;
             const maxValue = Math.max(...event.eventEnvelope);
             const elementHeight = 0.05;
             const barHeight = (x) => {
@@ -78,8 +79,6 @@ export class AudioTimeline extends HTMLElement {
             element.addEventListener('click', (evt) => {
                 evt.stopPropagation();
                 const event = events[index];
-                // console.log(events, index, event);
-                // TODO: Use generic form + type for event
                 const playedEvent = new CustomEvent('audio-view-played', {
                     cancelable: true,
                     bubbles: true,

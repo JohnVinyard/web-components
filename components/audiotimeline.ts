@@ -2,8 +2,8 @@ import { playAudio, context, fetchAudio } from './audioview';
 
 interface Event {
     eventTime: number;
-    eventDuration: number;
-    eventEnvelope: number[];
+    eventDuration?: number;
+    eventEnvelope?: number[];
     audioUrl: string;
     color: string;
     y: number;
@@ -12,8 +12,8 @@ interface Event {
 
 interface AudioPlayedEventDetails {
     url: string;
-    startSeconds: number;
-    durationSeconds: number;
+    startSeconds?: number;
+    durationSeconds?: number;
     eventTime: number;
 }
 
@@ -61,7 +61,8 @@ export class AudioTimeline extends HTMLElement {
         const events = this.eventData;
 
         const eventComponent = (event: Event): string => {
-            const step = event.eventDuration / event.eventEnvelope.length;
+            const step =
+                (event.eventDuration ?? 0.5) / event.eventEnvelope.length;
 
             const maxValue = Math.max(...event.eventEnvelope);
 
