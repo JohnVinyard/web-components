@@ -6,6 +6,10 @@ export class AudioTimeline extends HTMLElement {
         this.duration = '';
         this.width = '';
         this.height = '';
+        this.playOnClick = 'true';
+    }
+    get shouldPlayOnClick() {
+        return this.playOnClick.toLowerCase() === 'true';
     }
     get eventData() {
         const parsed = JSON.parse(this.events);
@@ -84,7 +88,9 @@ export class AudioTimeline extends HTMLElement {
                     },
                 });
                 this.dispatchEvent(playedEvent);
-                playAudio(event.audioUrl, context, event.offset, event.eventDuration);
+                if (this.shouldPlayOnClick) {
+                    playAudio(event.audioUrl, context, event.offset, event.eventDuration);
+                }
             });
         });
     }

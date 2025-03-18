@@ -15,6 +15,7 @@ export class AudioTimeline extends HTMLElement {
     public duration: string | null;
     public width: string | null;
     public height: string | null;
+    public playOnClick: string | null;
 
     constructor() {
         super();
@@ -22,6 +23,11 @@ export class AudioTimeline extends HTMLElement {
         this.duration = '';
         this.width = '';
         this.height = '';
+        this.playOnClick = 'true';
+    }
+
+    public get shouldPlayOnClick(): boolean {
+        return this.playOnClick.toLowerCase() === 'true';
     }
 
     public get eventData(): Event[] {
@@ -125,12 +131,14 @@ export class AudioTimeline extends HTMLElement {
                 });
                 this.dispatchEvent(playedEvent);
 
-                playAudio(
-                    event.audioUrl,
-                    context,
-                    event.offset,
-                    event.eventDuration
-                );
+                if (this.shouldPlayOnClick) {
+                    playAudio(
+                        event.audioUrl,
+                        context,
+                        event.offset,
+                        event.eventDuration
+                    );
+                }
             });
         });
     }
