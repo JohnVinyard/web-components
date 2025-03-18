@@ -307,7 +307,7 @@ export class AudioView extends HTMLElement {
                 'pixels',
                 'seconds'
             );
-            this.playAudio(this.src, startSeconds);
+            this.playAudio(this.src, startSeconds, undefined, event.timeStamp);
         });
 
         shadow
@@ -390,7 +390,8 @@ export class AudioView extends HTMLElement {
     public async playAudio(
         url: string,
         startSeconds: number,
-        durationSeconds: number = 5
+        durationSeconds: number = 5,
+        timestamp: number = 0
     ) {
         const duration =
             this.currentEndTimeSeconds !== null
@@ -404,6 +405,7 @@ export class AudioView extends HTMLElement {
                 url,
                 startSeconds,
                 durationSeconds,
+                eventTime: timestamp / 1000,
             },
         });
         this.dispatchEvent(playedEvent);

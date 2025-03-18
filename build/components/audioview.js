@@ -217,7 +217,7 @@ export class AudioView extends HTMLElement {
         container.addEventListener('click', (event) => {
             const clickedPixel = event.offsetX;
             const startSeconds = intervalMapping.map(clickedPixel, 'pixels', 'seconds');
-            this.playAudio(this.src, startSeconds);
+            this.playAudio(this.src, startSeconds, undefined, event.timeStamp);
         });
         shadow
             .querySelector('.audio-view-zoom-in')
@@ -274,7 +274,7 @@ export class AudioView extends HTMLElement {
     connectedCallback() {
         this.render();
     }
-    playAudio(url, startSeconds, durationSeconds = 5) {
+    playAudio(url, startSeconds, durationSeconds = 5, timestamp = 0) {
         return __awaiter(this, void 0, void 0, function* () {
             const duration = this.currentEndTimeSeconds !== null
                 ? this.currentEndTimeSeconds - startSeconds
@@ -286,6 +286,7 @@ export class AudioView extends HTMLElement {
                     url,
                     startSeconds,
                     durationSeconds,
+                    eventTime: timestamp / 1000,
                 },
             });
             this.dispatchEvent(playedEvent);
