@@ -48,13 +48,13 @@ export const sin2d = (arr: Float32Array[]): Float32Array[] => {
     return arr.map(sin);
 };
 
-const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
-    return a.map((value, index) => value + b[index]);
-};
+// const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
+//     return a.map((value, index) => value + b[index]);
+// };
 
-const multiply = (a: Float32Array, b: number): Float32Array => {
-    return a.map((value, index) => value * b);
-};
+// const multiply = (a: Float32Array, b: number): Float32Array => {
+//     return a.map((value, index) => value * b);
+// };
 
 const twoDimArray = (
     data: Float32Array,
@@ -316,19 +316,19 @@ export class Instrument extends HTMLElement {
                     return zeros(64);
                 }
 
-                return new Float32Array(64).map((x) =>
-                    Math.random() > 0.9 ? (Math.random() * 2 - 1) * 10 : 0
-                );
+                // return new Float32Array(64).map((x) =>
+                //     Math.random() > 0.9 ? (Math.random() * 2 - 1) * 10 : 0
+                // );
 
-                // const proj = dotProduct(clickPoint, this.weights);
-                // const sparse = relu(proj);
+                const proj = dotProduct(clickPoint, this.weights);
+                const sparse = relu(proj);
                 // console.log(
                 //     'CONTROL PLANE',
                 //     sparse,
                 //     this.weights.length,
                 //     this.weights[0].length
                 // );
-                // return sparse;
+                return sparse;
             }
 
             async shutdown() {
@@ -449,12 +449,17 @@ export class Instrument extends HTMLElement {
             console.log('CLICKED WITH', unit);
 
             if (unit) {
-                const width = container.clientWidth;
-                const height = container.clientHeight;
+                const rect = container.getBoundingClientRect();
 
-                // // Get click coordinates in [0, 1]
-                const x: number = event.offsetX / width;
-                const y: number = event.offsetY / height;
+                const x = (event.clientX - rect.left) / rect.width;
+                const y = (event.clientY - rect.top) / rect.height;
+
+                // const width = container.clientWidth;
+                // const height = container.clientHeight;
+
+                // // // Get click coordinates in [0, 1]
+                // const x: number = event.offsetX / width;
+                // const y: number = event.offsetY / height;
 
                 // // Project click location to control plane space, followed by RELU
                 const point: Point = { x, y };
