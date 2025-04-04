@@ -163,7 +163,7 @@ export class AudioView extends HTMLElement {
     private deriveCurrentEndTimeSeconds(
         intervalMapping: IntervalMapping<TimeUnits>,
         container: HTMLDivElement
-    ) {
+    ): number {
         const currentPixelPosition = container.scrollLeft;
         const currentVisiblePixels = this.parentElement.clientWidth;
         const endPixelPosition = currentPixelPosition + currentVisiblePixels;
@@ -180,6 +180,56 @@ export class AudioView extends HTMLElement {
                 'pixels',
                 'seconds'
             );
+        }
+
+        return this.currentEndTimeSeconds;
+    }
+
+    private renderSamples(
+        shadow: ShadowRoot,
+        totalSamples: number,
+        samplesPerBar: number,
+        loudnessMapping: IntervalMapping<LoudnessUnits>,
+        intervalMapping: IntervalMapping<TimeUnits>,
+        container: HTMLDivElement
+    ) {
+        const canvas: HTMLCanvasElement =
+            shadow.querySelector('.audio-view-canvas');
+
+        const audioData = this.buffer?.getChannelData(0) ?? new Float32Array(0);
+
+        const drawContext = canvas.getContext('2d');
+
+        // Clear all pixels
+        drawContext.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawContext.strokeStyle = this.color;
+        drawContext.fillStyle = this.color;
+
+        const midline = canvas.clientHeight / 2;
+
+        const startPixel = container.scrollLeft;
+        const endPixel = container.clientWidth + startPixel;
+
+        const startSample = Math.floor(
+            intervalMapping.map(startPixel, 'pixels', 'samples')
+        );
+        const endSample = Math.floor(
+            intervalMapping.map(endPixel, 'pixels', 'samples')
+        );
+
+        console.log(`Rendering from ${startSample} - ${endSample}`);
+        for (let i = startSample; i < endSample; i += samplesPerBar) {
+            const sampleValue = Math.abs(audioData[i]);
+
+            const sampleHeight = loudnessMapping.map(
+                sampleValue,
+                'raw',
+                'pixels'
+            );
+            const top = midline - sampleHeight / 2;
+            const xLocation = intervalMapping.map(i, 'samples', 'pixels');
+            drawContext.fillRect(xLocation, top, 1, sampleHeight);
         }
     }
 
@@ -255,7 +305,7 @@ export class AudioView extends HTMLElement {
                     cursor: pointer;
                     float: left;
                     margin: 3px;
-                    padding: 3px;
+                    padding: 10px;
                     font-size: 1em;
                     font-weight: bold;
                     background-color: #eee;
@@ -291,13 +341,26 @@ export class AudioView extends HTMLElement {
             '.audio-view-container'
         );
 
-        const canvas: HTMLCanvasElement =
-            shadow.querySelector('.audio-view-canvas');
-
         this.deriveCurrentEndTimeSeconds(intervalMapping, container);
 
+        let handle: NodeJS.Timeout | null = null;
+
         container.addEventListener('scroll', (event: any) => {
-            this.deriveCurrentEndTimeSeconds(intervalMapping, container);
+            if (handle !== null) {
+                clearTimeout(handle);
+            }
+
+            handle = setTimeout(() => {
+                this.deriveCurrentEndTimeSeconds(intervalMapping, container);
+                this.renderSamples(
+                    shadow,
+                    totalSamples,
+                    samplesPerBar,
+                    loudnessMapping,
+                    intervalMapping,
+                    container
+                );
+            }, 100);
         });
 
         container.addEventListener('click', (event: PointerEvent) => {
@@ -313,6 +376,7 @@ export class AudioView extends HTMLElement {
         shadow
             .querySelector('.audio-view-zoom-in')
             .addEventListener('click', (event: PointerEvent) => {
+                event.stopImmediatePropagation();
                 event.stopPropagation();
                 const raw = safeParseInt(this.scale, 1) * 0.5;
                 const clamped = clamp(raw, 1, 8);
@@ -322,6 +386,7 @@ export class AudioView extends HTMLElement {
         shadow
             .querySelector('.audio-view-zoom-out')
             .addEventListener('click', (event: PointerEvent) => {
+                event.stopImmediatePropagation();
                 event.stopPropagation();
                 const raw = safeParseInt(this.scale, 1) * 2;
                 const clamped = clamp(raw, 1, 8);
@@ -348,39 +413,21 @@ export class AudioView extends HTMLElement {
                     'pixels',
                     'seconds'
                 );
-                const canvas = this.shadowRoot.querySelector('canvas');
-                canvas.style.filter = '';
                 this.playAudio(this.src, startTimeSeconds);
             } else if (this.playingBuffer !== null) {
                 this.playingBuffer.stop();
                 this.playingBuffer = null;
-                const canvas = this.shadowRoot.querySelector('canvas');
-                canvas.style.filter = 'blur(2px)';
             }
         });
 
-        const audioData = this.buffer?.getChannelData(0) ?? new Float32Array(0);
-
-        const drawContext = canvas.getContext('2d');
-        drawContext.strokeStyle = this.color;
-        drawContext.fillStyle = this.color;
-
-        canvas.style.filter = 'blur(2px)';
-
-        const midline = canvas.clientHeight / 2;
-
-        for (let i = 0; i < totalSamples; i += samplesPerBar) {
-            const sampleValue = Math.abs(audioData[i]);
-
-            const sampleHeight = loudnessMapping.map(
-                sampleValue,
-                'raw',
-                'pixels'
-            );
-            const top = midline - sampleHeight / 2;
-            const xLocation = intervalMapping.map(i, 'samples', 'pixels');
-            drawContext.fillRect(xLocation, top, 1, sampleHeight);
-        }
+        this.renderSamples(
+            shadow,
+            totalSamples,
+            samplesPerBar,
+            loudnessMapping,
+            intervalMapping,
+            container
+        );
     }
 
     public connectedCallback() {
@@ -444,7 +491,7 @@ export class AudioView extends HTMLElement {
             );
             container.classList.remove('playing');
             const canvas = this.shadowRoot.querySelector('canvas');
-            canvas.style.filter = 'blur(2px)';
+            // canvas.style.filter = 'blur(2px)';
         }, duration * 1000);
     }
 

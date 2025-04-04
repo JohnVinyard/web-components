@@ -10,8 +10,10 @@ interface AdjustParameterEvent {
     type: 'adjust-parameter';
 }
 
+type ModelType = 'string' | 'plate' | 'random' | 'multi-string';
+
 interface ChangeModelTypeEvent {
-    value: 'string' | 'plate' | 'random';
+    value: ModelType;
     type: 'model-type';
 }
 
@@ -33,14 +35,12 @@ interface MeshInfo {
 const pointsEqual = (p1: Float32Array, p2: Float32Array): boolean => {
     return p1[0] == p2[0] && p1[1] == p2[1];
 };
-// type CommunicationEvent =
-//     | ForceInjectionEvent
-//     | AdjustParameterEvent
-//     | ChangeModelTypeEvent;
 
 export class PhysicalStringSimulation extends HTMLElement {
     private initialized: boolean = false;
     private node: AudioWorkletNode | null = null;
+    private mostRecentlyStruck: Float32Array | null;
+    private isUsingAccelerometer: boolean = false;
 
     constructor() {
         super();
@@ -107,6 +107,7 @@ export class PhysicalStringSimulation extends HTMLElement {
                 <option value="string" selected>String</option>
                 <option value="plate">Plate</option>
                 <option value="random">Random</option>
+                <option value="multi-string">Multi-String</option>
             </select>
         </div>
         <div class="control">
@@ -145,6 +146,14 @@ export class PhysicalStringSimulation extends HTMLElement {
                 step="0.0001"
             />
         </div>
+        <div class="control">
+            <label for="use-accelerometer">Use Accelerometer</label>
+            <input 
+                type="checkbox"
+                id="use-accelerometer" 
+                name="use-accelerometer" 
+            />
+        </div>
         `;
 
         const clickArea = shadow.getElementById(
@@ -165,7 +174,6 @@ export class PhysicalStringSimulation extends HTMLElement {
 
             try {
                 await context.audioWorklet.addModule(
-                    // '/build/components/physical.js'
                     'build/components/physical.js'
                 );
             } catch (err) {
@@ -181,6 +189,8 @@ export class PhysicalStringSimulation extends HTMLElement {
 
             this.node.port.onmessage = (event: MessageEvent<MeshInfo>) => {
                 const { masses, springs, struck } = event.data;
+
+                this.mostRecentlyStruck = struck;
 
                 const elements = masses.map(
                     (m) => `<circle 
@@ -276,7 +286,9 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
-        const modelTypeSelect = shadow.getElementById('model-type') as HTMLInputElement;
+        const modelTypeSelect = shadow.getElementById(
+            'model-type'
+        ) as HTMLInputElement;
 
         modelTypeSelect.addEventListener('change', (event: Event) => {
             const target = event.target as HTMLSelectElement;
@@ -285,10 +297,14 @@ export class PhysicalStringSimulation extends HTMLElement {
             if (this.node?.port) {
                 const message: ChangeModelTypeEvent = {
                     type: 'model-type',
-                    value: newValue as 'string' | 'plate' | 'random',
+                    value: newValue as ModelType,
                 };
                 this.node.port.postMessage(message);
-                if (newValue === 'string' || newValue === 'random') {
+                if (
+                    newValue === 'string' ||
+                    newValue === 'random' ||
+                    newValue === 'multi-string'
+                ) {
                     massSlider.value = '10';
                     tensionSlider.value = '0.5';
                     dampingSlider.value = '0.9998';
@@ -300,17 +316,12 @@ export class PhysicalStringSimulation extends HTMLElement {
             }
         });
 
-        clickArea.addEventListener('click', async (event: MouseEvent) => {
-            await initialize();
-
-            const rect = clickArea.getBoundingClientRect();
-            const yPos = (event.pageX - rect.left) / rect.width;
-            const xPos = (event.pageY - rect.top) / rect.height;
-
-            const currentModel = (modelTypeSelect as HTMLInputElement).value as
-                | 'string'
-                | 'plate'
-                | 'random';
+        const injectForce = (
+            xPos: number,
+            yPos: number,
+            magnitude: number = 1
+        ) => {
+            const currentModel = (modelTypeSelect as HTMLInputElement).value as ModelType;
 
             const force: ForceInjectionEvent = {
                 location:
@@ -320,17 +331,81 @@ export class PhysicalStringSimulation extends HTMLElement {
                 force:
                     currentModel === 'plate' || currentModel === 'random'
                         ? new Float32Array([
-                              Math.random() * 0.5,
-                              Math.random() * 0.5,
+                              Math.random() * 0.5 * magnitude,
+                              Math.random() * 0.5 * magnitude,
                           ])
-                        : new Float32Array([0.1 + Math.random() * 0.5, 0]),
+                        : new Float32Array([
+                              0.1 + Math.random() * 0.5 * magnitude,
+                              0 * magnitude,
+                          ]),
                 type: 'force-injection',
             };
 
             if (this.node?.port) {
                 this.node.port.postMessage(force);
             }
+        };
+
+        clickArea.addEventListener('click', async (event: MouseEvent) => {
+            await initialize();
+            const rect = clickArea.getBoundingClientRect();
+            const yPos = (event.pageX - rect.left) / rect.width;
+            const xPos = (event.pageY - rect.top) / rect.height;
+            injectForce(xPos, yPos);
         });
+
+        const useAcc = () => {
+            if (DeviceMotionEvent) {
+                window.addEventListener(
+                    'devicemotion',
+                    (event) => {
+                        if (!this.isUsingAccelerometer) {
+                            return;
+                        }
+
+                        const threshold: number = 4;
+
+                        const xAcc = Math.abs(event.acceleration.x);
+                        const yAcc = Math.abs(event.acceleration.y);
+                        const zAcc = Math.abs(event.acceleration.z);
+
+                        const thresholdExceeded: boolean =
+                            xAcc > threshold ||
+                            yAcc > threshold ||
+                            zAcc > threshold;
+
+                        if (
+                            thresholdExceeded &&
+                            this.isUsingAccelerometer &&
+                            this.mostRecentlyStruck
+                        ) {
+                            const magnitude = Math.max(xAcc, yAcc, zAcc) / 4;
+
+                            injectForce(
+                                this.mostRecentlyStruck[0],
+                                this.mostRecentlyStruck[1],
+                                magnitude
+                            );
+                        }
+                    },
+                    true
+                );
+            } else {
+                console.log('Device motion not supported');
+                alert('device motion not supported');
+            }
+        };
+
+        const useAccelerometerCheckbox = shadow.getElementById(
+            'use-accelerometer'
+        ) as HTMLInputElement;
+        useAccelerometerCheckbox.addEventListener('change', (event) => {
+            // @ts-ignore
+            this.isUsingAccelerometer = event.target.checked;
+            console.log('USING', this.isUsingAccelerometer);
+        });
+
+        useAcc();
     }
 
     public connectedCallback() {

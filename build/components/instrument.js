@@ -348,17 +348,6 @@ export class Instrument extends HTMLElement {
         };
         const useAcc = () => {
             if (DeviceMotionEvent) {
-                // window.addEventListener(
-                //     'deviceorientationabsolute',
-                //     (event) => {
-                //         const u = gamma.translateTo(event.gamma, unitInterval);
-                //         const hz = unitInterval.translateTo(
-                //             u ** 4,
-                //             filterCutoff
-                //         );
-                //         // unit.updateCutoff(hz);
-                //     }
-                // );
                 window.addEventListener('devicemotion', (event) => {
                     const threshold = 10;
                     /**
@@ -368,17 +357,9 @@ export class Instrument extends HTMLElement {
                      * - project the 3D acceleration vector
                      */
                     // threshold falls linearly, with a floor of 4
-                    // TODO: maybe this trigger condition should be the norm as well?
                     if (Math.abs(event.acceleration.x) > threshold ||
                         Math.abs(event.acceleration.y) > threshold ||
                         Math.abs(event.acceleration.z) > threshold) {
-                        // const norm = Math.sqrt(
-                        //     event.acceleration.x ** 2 +
-                        //         event.acceleration.y ** 2 +
-                        //         event.acceleration.z ** 2
-                        // );
-                        // unit threshold goes up when triggered, like a refractory
-                        // period
                         const accelerationVector = new Float32Array([
                             event.acceleration.x,
                             event.acceleration.y,
@@ -392,10 +373,6 @@ export class Instrument extends HTMLElement {
                             x: 0,
                             y: 0,
                         });
-                        // unit.trigger(
-                        //     Array.from(activeNotes).map((an) => notes[an]),
-                        //     norm * 0.2
-                        // );
                     }
                 }, true);
             }

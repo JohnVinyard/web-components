@@ -26,6 +26,10 @@ const zerosLike = (x: Float32Array): Float32Array => {
     return new Float32Array(x.length).fill(0);
 };
 
+const randomLike = (x: Float32Array, magnitude: number = 1): Float32Array => {
+    return zerosLike(x).map((x) => Math.random() * magnitude - magnitude / 2);
+};
+
 // TODO: re-implement as for-loop
 const vectorSum = (vec: Float32Array): number => {
     // return vec.reduce((accum, current) => accum + current, 0);
@@ -218,10 +222,10 @@ class Force {
 }
 
 class SpringMesh {
-    private readonly masses: Mass[];
+    public readonly masses: Mass[];
     private mostRecentMassContacted: Mass | null = null;
 
-    constructor(private readonly springs: Spring[]) {
+    constructor(public readonly springs: Spring[]) {
         this.masses = Object.values(
             springs.reduce((accum: Record<string, Mass>, current: Spring) => {
                 accum[current.m1.id] = current.m1;
@@ -229,6 +233,17 @@ class SpringMesh {
                 return accum;
             }, {})
         );
+    }
+
+    public static compose(meshes: SpringMesh[]): SpringMesh {
+        const allSprings: Spring[] = meshes.reduce(
+            (accum: Spring[], current: SpringMesh) => {
+                return [...accum, ...current.springs];
+            },
+            []
+        );
+
+        return new SpringMesh(allSprings);
     }
 
     public toMeshInfo(): MeshInfo {
@@ -451,15 +466,18 @@ const buildString = (
     mass: number = 10,
     tension: number = 0.5,
     damping: number = 0.9998,
-    nMasses: number = 64
+    nMasses: number = 64,
+    xPos: number = 0.5,
+    lengthCoefficient: number = 1,
+    idPrefix = ''
 ): SpringMesh => {
     // Create the masses
 
     let masses: Mass[] = [];
     for (let i = 0; i < nMasses; i++) {
         const newMass = new Mass(
-            i.toString(),
-            new Float32Array([0.5, i / nMasses]),
+            `${idPrefix}${i.toString()}`,
+            new Float32Array([xPos, (i / nMasses) * lengthCoefficient]),
             mass,
             damping,
             i === 0 || i === nMasses - 1
@@ -477,6 +495,34 @@ const buildString = (
     return mesh;
 };
 
+const buildMultiString = (
+    mass: number = 10,
+    tension: number = 0.5,
+    damping: number = 0.9998,
+    massesPerString: number = 8,
+    nStrings: number = 8
+): SpringMesh => {
+    const meshes: SpringMesh[] = [];
+    for (let i = 0; i < nStrings; i++) {
+        const xPos = i / nStrings;
+        const lengthCoeff = (i + 1) / nStrings;
+        const sm = buildString(
+            mass,
+            tension,
+            damping,
+            massesPerString,
+            xPos,
+            lengthCoeff,
+            `string${i}`
+        );
+        meshes.push(sm);
+    }
+
+    const result = SpringMesh.compose(meshes);
+    console.log(result.masses);
+    return result;
+};
+
 interface ForceInjectionEvent {
     force: Float32Array;
     location: Float32Array;
@@ -490,7 +536,7 @@ interface AdjustParameterEvent {
 }
 
 interface ChangeModelTypeEvent {
-    value: 'string' | 'plate' | 'random';
+    value: 'string' | 'plate' | 'random' | 'multi-string';
     type: 'model-type';
 }
 
@@ -547,6 +593,8 @@ class Physical extends AudioWorkletProcessor {
                     this.mesh = buildString();
                 } else if (value === 'random') {
                     this.mesh = buildRandom();
+                } else if (value === 'multi-string') {
+                    this.mesh = buildMultiString();
                 } else {
                     throw new Error('Unsupported model type');
                 }

@@ -121,9 +121,43 @@ export class AudioView extends HTMLElement {
         else {
             this.currentEndTimeSeconds = intervalMapping.map(endPixelPosition, 'pixels', 'seconds');
         }
+        return this.currentEndTimeSeconds;
+    }
+    renderSamples(shadow, totalSamples, samplesPerBar, loudnessMapping, intervalMapping, container) {
+        var _a, _b;
+        const canvas = shadow.querySelector('.audio-view-canvas');
+        const audioData = (_b = (_a = this.buffer) === null || _a === void 0 ? void 0 : _a.getChannelData(0)) !== null && _b !== void 0 ? _b : new Float32Array(0);
+        const drawContext = canvas.getContext('2d');
+        // Clear all pixels
+        drawContext.clearRect(0, 0, canvas.width, canvas.height);
+        drawContext.strokeStyle = this.color;
+        drawContext.fillStyle = this.color;
+        // canvas.style.filter = 'blur(2px)';
+        const midline = canvas.clientHeight / 2;
+        const startPixel = container.scrollLeft;
+        const endPixel = container.clientWidth + startPixel;
+        const startSample = Math.floor(intervalMapping.map(startPixel, 'pixels', 'samples'));
+        const endSample = Math.floor(intervalMapping.map(endPixel, 'pixels', 'samples'));
+        // const currentEndTimePixels = this.deriveCurrentEndTimeSeconds(
+        //     intervalMapping,
+        //     container
+        // );
+        // const currentEndTimeSamples = intervalMapping.map(
+        //     currentEndTimePixels,
+        //     'pixels',
+        //     'samples'
+        // );
+        console.log(`Rendering from ${startSample} - ${endSample}`);
+        for (let i = startSample; i < endSample; i += samplesPerBar) {
+            const sampleValue = Math.abs(audioData[i]);
+            const sampleHeight = loudnessMapping.map(sampleValue, 'raw', 'pixels');
+            const top = midline - sampleHeight / 2;
+            const xLocation = intervalMapping.map(i, 'samples', 'pixels');
+            drawContext.fillRect(xLocation, top, 1, sampleHeight);
+        }
     }
     render() {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d;
         let shadow = this.shadowRoot;
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
@@ -177,7 +211,7 @@ export class AudioView extends HTMLElement {
                     cursor: pointer;
                     float: left;
                     margin: 3px;
-                    padding: 3px;
+                    padding: 10px;
                     font-size: 1em;
                     font-weight: bold;
                     background-color: #eee;
@@ -209,10 +243,16 @@ export class AudioView extends HTMLElement {
             </div>
         `;
         const container = shadow.querySelector('.audio-view-container');
-        const canvas = shadow.querySelector('.audio-view-canvas');
         this.deriveCurrentEndTimeSeconds(intervalMapping, container);
+        let handle = null;
         container.addEventListener('scroll', (event) => {
-            this.deriveCurrentEndTimeSeconds(intervalMapping, container);
+            if (handle !== null) {
+                clearTimeout(handle);
+            }
+            handle = setTimeout(() => {
+                this.deriveCurrentEndTimeSeconds(intervalMapping, container);
+                this.renderSamples(shadow, totalSamples, samplesPerBar, loudnessMapping, intervalMapping, container);
+            }, 100);
         });
         container.addEventListener('click', (event) => {
             const clickedPixel = event.offsetX;
@@ -222,6 +262,7 @@ export class AudioView extends HTMLElement {
         shadow
             .querySelector('.audio-view-zoom-in')
             .addEventListener('click', (event) => {
+            event.stopImmediatePropagation();
             event.stopPropagation();
             const raw = safeParseInt(this.scale, 1) * 0.5;
             const clamped = clamp(raw, 1, 8);
@@ -230,6 +271,7 @@ export class AudioView extends HTMLElement {
         shadow
             .querySelector('.audio-view-zoom-out')
             .addEventListener('click', (event) => {
+            event.stopImmediatePropagation();
             event.stopPropagation();
             const raw = safeParseInt(this.scale, 1) * 2;
             const clamped = clamp(raw, 1, 8);
@@ -247,29 +289,28 @@ export class AudioView extends HTMLElement {
                 const startPositionPixels = container.scrollLeft;
                 const startTimeSeconds = intervalMapping.map(startPositionPixels, 'pixels', 'seconds');
                 const canvas = this.shadowRoot.querySelector('canvas');
-                canvas.style.filter = '';
+                // canvas.style.filter = '';
                 this.playAudio(this.src, startTimeSeconds);
             }
             else if (this.playingBuffer !== null) {
                 this.playingBuffer.stop();
                 this.playingBuffer = null;
                 const canvas = this.shadowRoot.querySelector('canvas');
-                canvas.style.filter = 'blur(2px)';
+                // canvas.style.filter = 'blur(2px)';
             }
         }));
-        const audioData = (_f = (_e = this.buffer) === null || _e === void 0 ? void 0 : _e.getChannelData(0)) !== null && _f !== void 0 ? _f : new Float32Array(0);
-        const drawContext = canvas.getContext('2d');
-        drawContext.strokeStyle = this.color;
-        drawContext.fillStyle = this.color;
-        canvas.style.filter = 'blur(2px)';
-        const midline = canvas.clientHeight / 2;
-        for (let i = 0; i < totalSamples; i += samplesPerBar) {
-            const sampleValue = Math.abs(audioData[i]);
-            const sampleHeight = loudnessMapping.map(sampleValue, 'raw', 'pixels');
-            const top = midline - sampleHeight / 2;
-            const xLocation = intervalMapping.map(i, 'samples', 'pixels');
-            drawContext.fillRect(xLocation, top, 1, sampleHeight);
-        }
+        this.renderSamples(shadow, totalSamples, samplesPerBar, loudnessMapping, intervalMapping, container);
+        // for (let i = 0; i < totalSamples; i += samplesPerBar) {
+        //     const sampleValue = Math.abs(audioData[i]);
+        //     const sampleHeight = loudnessMapping.map(
+        //         sampleValue,
+        //         'raw',
+        //         'pixels'
+        //     );
+        //     const top = midline - sampleHeight / 2;
+        //     const xLocation = intervalMapping.map(i, 'samples', 'pixels');
+        //     drawContext.fillRect(xLocation, top, 1, sampleHeight);
+        // }
     }
     connectedCallback() {
         this.render();
@@ -308,7 +349,7 @@ export class AudioView extends HTMLElement {
                 const container = this.shadowRoot.querySelector('.audio-view-container');
                 container.classList.remove('playing');
                 const canvas = this.shadowRoot.querySelector('canvas');
-                canvas.style.filter = 'blur(2px)';
+                // canvas.style.filter = 'blur(2px)';
             }, duration * 1000);
         });
     }
