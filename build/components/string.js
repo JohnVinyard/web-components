@@ -252,12 +252,17 @@ export class PhysicalStringSimulation extends HTMLElement {
         });
         const injectForce = (xPos, yPos, magnitude = 1) => {
             var _a;
-            const currentModel = modelTypeSelect.value;
+            const currentModel = modelTypeSelect
+                .value;
             const force = {
-                location: currentModel === 'plate' || currentModel === 'random'
+                location: currentModel === 'plate' ||
+                    currentModel === 'random' ||
+                    currentModel === 'multi-string'
                     ? new Float32Array([xPos, yPos])
                     : new Float32Array([0, yPos]),
-                force: currentModel === 'plate' || currentModel === 'random'
+                force: currentModel === 'plate' ||
+                    currentModel === 'random' ||
+                    currentModel === 'multi-string'
                     ? new Float32Array([
                         Math.random() * 0.5 * magnitude,
                         Math.random() * 0.5 * magnitude,

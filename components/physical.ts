@@ -510,7 +510,7 @@ const buildMultiString = (
             mass,
             tension,
             damping,
-            massesPerString,
+            3 + i,
             xPos,
             lengthCoeff,
             `string${i}`

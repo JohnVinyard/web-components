@@ -328,7 +328,7 @@ const buildMultiString = (mass = 10, tension = 0.5, damping = 0.9998, massesPerS
     for (let i = 0; i < nStrings; i++) {
         const xPos = i / nStrings;
         const lengthCoeff = (i + 1) / nStrings;
-        const sm = buildString(mass, tension, damping, massesPerString, xPos, lengthCoeff, `string${i}`);
+        const sm = buildString(mass, tension, damping, 3 + i, xPos, lengthCoeff, `string${i}`);
         meshes.push(sm);
     }
     const result = SpringMesh.compose(meshes);

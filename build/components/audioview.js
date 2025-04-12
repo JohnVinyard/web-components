@@ -132,21 +132,11 @@ export class AudioView extends HTMLElement {
         drawContext.clearRect(0, 0, canvas.width, canvas.height);
         drawContext.strokeStyle = this.color;
         drawContext.fillStyle = this.color;
-        // canvas.style.filter = 'blur(2px)';
         const midline = canvas.clientHeight / 2;
         const startPixel = container.scrollLeft;
         const endPixel = container.clientWidth + startPixel;
         const startSample = Math.floor(intervalMapping.map(startPixel, 'pixels', 'samples'));
         const endSample = Math.floor(intervalMapping.map(endPixel, 'pixels', 'samples'));
-        // const currentEndTimePixels = this.deriveCurrentEndTimeSeconds(
-        //     intervalMapping,
-        //     container
-        // );
-        // const currentEndTimeSamples = intervalMapping.map(
-        //     currentEndTimePixels,
-        //     'pixels',
-        //     'samples'
-        // );
         console.log(`Rendering from ${startSample} - ${endSample}`);
         for (let i = startSample; i < endSample; i += samplesPerBar) {
             const sampleValue = Math.abs(audioData[i]);
@@ -288,29 +278,14 @@ export class AudioView extends HTMLElement {
             if (this.isPlaying) {
                 const startPositionPixels = container.scrollLeft;
                 const startTimeSeconds = intervalMapping.map(startPositionPixels, 'pixels', 'seconds');
-                const canvas = this.shadowRoot.querySelector('canvas');
-                // canvas.style.filter = '';
                 this.playAudio(this.src, startTimeSeconds);
             }
             else if (this.playingBuffer !== null) {
                 this.playingBuffer.stop();
                 this.playingBuffer = null;
-                const canvas = this.shadowRoot.querySelector('canvas');
-                // canvas.style.filter = 'blur(2px)';
             }
         }));
         this.renderSamples(shadow, totalSamples, samplesPerBar, loudnessMapping, intervalMapping, container);
-        // for (let i = 0; i < totalSamples; i += samplesPerBar) {
-        //     const sampleValue = Math.abs(audioData[i]);
-        //     const sampleHeight = loudnessMapping.map(
-        //         sampleValue,
-        //         'raw',
-        //         'pixels'
-        //     );
-        //     const top = midline - sampleHeight / 2;
-        //     const xLocation = intervalMapping.map(i, 'samples', 'pixels');
-        //     drawContext.fillRect(xLocation, top, 1, sampleHeight);
-        // }
     }
     connectedCallback() {
         this.render();
