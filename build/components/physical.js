@@ -323,7 +323,7 @@ const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 64, x
     const mesh = new SpringMesh(springs);
     return mesh;
 };
-const buildMultiString = (mass = 10, tension = 0.5, damping = 0.9998, massesPerString = 8, nStrings = 8) => {
+const buildMultiString = (mass = 10, tension = 0.5, damping = 0.9998, massesPerString = 8, nStrings = 10) => {
     const meshes = [];
     for (let i = 0; i < nStrings; i++) {
         const xPos = i / nStrings;
