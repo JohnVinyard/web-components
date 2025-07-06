@@ -8,6 +8,62 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { fromNpy } from './numpy';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+const createHandLandmarker = () => __awaiter(void 0, void 0, void 0, function* () {
+    const vision = yield FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+    const handLandmarker = yield HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        },
+        numHands: 1,
+        runningMode: 'VIDEO',
+    });
+    return handLandmarker;
+});
+const enableCam = (shadowRoot
+// video: HTMLVideoElement,
+// predictWebcam: () => void
+) => __awaiter(void 0, void 0, void 0, function* () {
+    const stream = yield navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+    });
+    const video = shadowRoot.querySelector('video');
+    video.srcObject = stream;
+    // video.addEventListener('loadeddata', () => {
+    //     predictWebcam();
+    // });
+});
+let lastVideoTime = 0;
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx) => {
+    const predictWebcam = () => {
+        const video = shadowRoot.querySelector('video');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let startTimeMs = performance.now();
+        if (lastVideoTime !== video.currentTime) {
+            const detections = handLandmarker.detectForVideo(video, startTimeMs);
+            // Process and draw landmarks from 'detections'
+            if (detections.landmarks) {
+                for (const landmarks of detections.landmarks) {
+                    console.log(landmarks);
+                    for (const landmark of landmarks) {
+                        const x = landmark.x * canvas.width;
+                        const y = landmark.y * canvas.height;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'red';
+                        ctx.fill();
+                    }
+                }
+            }
+            lastVideoTime = video.currentTime;
+        }
+        requestAnimationFrame(predictWebcam);
+    };
+    return predictWebcam;
+};
 export const pointToArray = (point) => {
     return new Float32Array([point.x, point.y]);
 };
@@ -104,7 +160,9 @@ export class Instrument extends HTMLElement {
     constructor() {
         super();
         this.url = null;
+        this.initialized = false;
         this.url = null;
+        this.initialized = false;
     }
     render() {
         let shadow = this.shadowRoot;
@@ -141,27 +199,23 @@ export class Instrument extends HTMLElement {
         };
         shadow.innerHTML = `
 <style>
-        div {
-            margin: 10px;
-        }
-        .instrument-container {
-            height: 200px;
-            cursor: pointer;
+
+        #video-container {
             position: relative;
-            -webkit-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
-            -moz-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
-            box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
         }
-        .instrument-container.initialized {
-            background-color: #00ff00;
-        }
-        .current-event-vector {
+
+        #canvas-element, 
+        #video-element {
             position: absolute;
-            top: 10px;
-            left: 150px;
+            top: 0;
+            left: 0;
         }
-        p {
-            margin-left: 10px;
+
+        #video-container, 
+        #canvas-element, 
+        #video-element {
+            width: 500px;
+            height: 500px;
         }
 </style>
 <div class="instrument-container">
@@ -175,12 +229,33 @@ export class Instrument extends HTMLElement {
         <div class="current-event-vector" title="Most recent control-plane input vector">
             ${renderVector(currentControlPlaneVector)}
         </div>
+        <div id="video-container">
+            <video autoplay playsinline id="video-element"></video>
+            <canvas id="canvas-element" height="500" width="500"></canvas>
+        </div>
+        
 </div>
 `;
         const start = shadow.getElementById('start-demo');
         const stop = shadow.getElementById('stop-demo');
         const container = shadow.querySelector('.instrument-container');
         const eventVectorContainer = shadow.querySelector('.current-event-vector');
+        // const video = shadow.querySelector('video') as HTMLVideoElement;
+        const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
+            const landmarker = yield createHandLandmarker();
+            const canvas = shadow.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            enableCam(shadow);
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx);
+            const video = shadow.querySelector('video');
+            video.addEventListener('loadeddata', () => {
+                loop();
+            });
+        });
+        if (!this.initialized) {
+            prepareForVideo();
+            this.initialized = true;
+        }
         const rnnWeightsUrl = this.url;
         class ConvUnit {
             constructor(url) {
@@ -215,17 +290,8 @@ export class Instrument extends HTMLElement {
                 if (!this.weights) {
                     return zeros(64);
                 }
-                // return new Float32Array(64).map((x) =>
-                //     Math.random() > 0.9 ? (Math.random() * 2 - 1) * 10 : 0
-                // );
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
-                // console.log(
-                //     'CONTROL PLANE',
-                //     sparse,
-                //     this.weights.length,
-                //     this.weights[0].length
-                // );
                 return sparse;
             }
             shutdown() {
@@ -243,7 +309,7 @@ export class Instrument extends HTMLElement {
                     try {
                         yield context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.57/build/components/rnn.js');
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/rnn.js');
                     }
                     catch (err) {
                         console.log(`Failed to add module due to ${err}`);
@@ -304,7 +370,6 @@ export class Instrument extends HTMLElement {
                 }
             }
         }
-        // const activeNotes = new Set(['C']);
         const unit = new Controller(Object.values(notes));
         const clickHandler = (event) => {
             console.log('CLICKED WITH', unit);
@@ -312,11 +377,6 @@ export class Instrument extends HTMLElement {
                 const rect = container.getBoundingClientRect();
                 const x = (event.clientX - rect.left) / rect.width;
                 const y = (event.clientY - rect.top) / rect.height;
-                // const width = container.clientWidth;
-                // const height = container.clientHeight;
-                // // // Get click coordinates in [0, 1]
-                // const x: number = event.offsetX / width;
-                // const y: number = event.offsetY / height;
                 // // Project click location to control plane space, followed by RELU
                 const point = { x, y };
                 const pointArr = pointToArray(point);
@@ -329,62 +389,70 @@ export class Instrument extends HTMLElement {
                 unit.triggerInstrument(pos, { x, y });
             }
         };
-        const useMouse = () => {
-            container.addEventListener('click', clickHandler);
-            // document.addEventListener(
-            //     'mousemove',
-            //     ({ movementX, movementY, clientX, clientY }) => {
-            //         if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
-            //             unit.trigger(
-            //                 Array.from(activeNotes).map((an) => notes[an]),
-            //                 1
-            //             );
-            //         }
-            //         const u = vertical.translateTo(clientY, unitInterval);
-            //         const hz = unitInterval.translateTo(u ** 2, filterCutoff);
-            //         unit.updateCutoff(hz);
-            //     }
-            // );
-        };
-        const useAcc = () => {
-            if (DeviceMotionEvent) {
-                window.addEventListener('devicemotion', (event) => {
-                    const threshold = 10;
-                    /**
-                     * TODO:
-                     *
-                     * - settable thresholds for spacing in time as well as norm of motion
-                     * - project the 3D acceleration vector
-                     */
-                    // threshold falls linearly, with a floor of 4
-                    if (Math.abs(event.acceleration.x) > threshold ||
-                        Math.abs(event.acceleration.y) > threshold ||
-                        Math.abs(event.acceleration.z) > threshold) {
-                        const accelerationVector = new Float32Array([
-                            event.acceleration.x,
-                            event.acceleration.y,
-                            event.acceleration.z,
-                        ]);
-                        const controlPlane = unit.projectAcceleration(accelerationVector);
-                        currentControlPlaneVector.set(controlPlane);
-                        eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
-                        // TODO: The point argument is unused/unnecessary
-                        unit.triggerInstrument(controlPlane, {
-                            x: 0,
-                            y: 0,
-                        });
-                    }
-                }, true);
-            }
-            else {
-                console.log('Device motion not supported');
-                alert('device motion not supported');
-            }
-        };
+        // const useMouse = () => {
+        //     container.addEventListener('click', clickHandler);
+        //     // document.addEventListener(
+        //     //     'mousemove',
+        //     //     ({ movementX, movementY, clientX, clientY }) => {
+        //     //         if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
+        //     //             unit.trigger(
+        //     //                 Array.from(activeNotes).map((an) => notes[an]),
+        //     //                 1
+        //     //             );
+        //     //         }
+        //     //         const u = vertical.translateTo(clientY, unitInterval);
+        //     //         const hz = unitInterval.translateTo(u ** 2, filterCutoff);
+        //     //         unit.updateCutoff(hz);
+        //     //     }
+        //     // );
+        // };
+        // const useAcc = () => {
+        //     if (DeviceMotionEvent) {
+        //         window.addEventListener(
+        //             'devicemotion',
+        //             (event) => {
+        //                 const threshold: number = 10;
+        //                 /**
+        //                  * TODO:
+        //                  *
+        //                  * - settable thresholds for spacing in time as well as norm of motion
+        //                  * - project the 3D acceleration vector
+        //                  */
+        //                 // threshold falls linearly, with a floor of 4
+        //                 if (
+        //                     Math.abs(event.acceleration.x) > threshold ||
+        //                     Math.abs(event.acceleration.y) > threshold ||
+        //                     Math.abs(event.acceleration.z) > threshold
+        //                 ) {
+        //                     const accelerationVector = new Float32Array([
+        //                         event.acceleration.x,
+        //                         event.acceleration.y,
+        //                         event.acceleration.z,
+        //                     ]);
+        //                     const controlPlane =
+        //                         unit.projectAcceleration(accelerationVector);
+        //                     currentControlPlaneVector.set(controlPlane);
+        //                     eventVectorContainer.innerHTML = renderVector(
+        //                         currentControlPlaneVector
+        //                     );
+        //                     // TODO: The point argument is unused/unnecessary
+        //                     unit.triggerInstrument(controlPlane, {
+        //                         x: 0,
+        //                         y: 0,
+        //                     });
+        //                 }
+        //             },
+        //             true
+        //         );
+        //     } else {
+        //         console.log('Device motion not supported');
+        //         alert('device motion not supported');
+        //     }
+        // };
         start.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
-            useAcc();
+            // useAcc();
             console.log('BEGINNING MONITORIING');
-            useMouse();
+            // useMouse();
             // TODO: How do I get to the button element here?
             // @ts-ignore
             event.target.disabled = true;

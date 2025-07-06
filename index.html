@@ -19,24 +19,26 @@
                 text-decoration: underline;
             }
         </style>
-        <script type="text/javascript">
-           
-            document.addEventListener('audio-view-played', (event) => {
-                console.log('PLAYED', event.detail);
-            })
-        </script>
         
     </head>
 
     <body>
         <h1>Web Component Demo</h1>
 
+        <video autoplay playsinline></video>
+        <div>
+            <h2>Instrument</h2>
+            <instrument-element 
+                url="https://state-space-model-demo-2.s3.amazonaws.com/rnnweights1_c40f3c29f83a76b2e13edf1b5267a142b517997c" 
+                />
+        </div>
+
         <!-- <div>
             <h2>String Simulation</h2>
             <physical-string-sim></physical-string-sim>
         </div> -->
 
-        <div>
+        <!-- <div>
             <h2>Audio Timeline</h2>
             <audio-timeline
                 events='[
@@ -63,9 +65,9 @@
                 width="800"
                 height="250"
             ></audio-timeline>
-        </div>
+        </div> -->
 
-        <div>
+        <!-- <div>
             <h2>Audio Timeline (does not play on click)</h2>
             <audio-timeline
                 events='[
@@ -241,7 +243,7 @@ def func(x: torch.Tensor) -> torch.Tensor:
                         ]'
                     />
                     <hr />
-                </div>
+                </div> -->
 
             </body>
         </html>

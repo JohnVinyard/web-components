@@ -1,4 +1,81 @@
 import { fromNpy } from './numpy';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
+
+const createHandLandmarker = async (): Promise<HandLandmarker> => {
+    const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+    );
+    const handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath:
+                'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        },
+        numHands: 1,
+        runningMode: 'VIDEO',
+    });
+    return handLandmarker;
+};
+
+const enableCam = async (
+    shadowRoot: ShadowRoot
+    // video: HTMLVideoElement,
+    // predictWebcam: () => void
+): Promise<void> => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+    });
+
+    const video = shadowRoot.querySelector('video');
+    video.srcObject = stream;
+
+    // video.addEventListener('loadeddata', () => {
+    //     predictWebcam();
+    // });
+};
+
+let lastVideoTime: number = 0;
+
+const predictWebcamLoop = (
+    shadowRoot: ShadowRoot,
+    handLandmarker: HandLandmarker,
+    canvas: HTMLCanvasElement,
+    ctx: CanvasRenderingContext2D
+): (() => void) => {
+    const predictWebcam = () => {
+        const video = shadowRoot.querySelector('video');
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let startTimeMs = performance.now();
+        if (lastVideoTime !== video.currentTime) {
+            const detections = handLandmarker.detectForVideo(
+                video,
+                startTimeMs
+            );
+            // Process and draw landmarks from 'detections'
+            if (detections.landmarks) {
+                for (const landmarks of detections.landmarks) {
+                    console.log(landmarks);
+                    for (const landmark of landmarks) {
+                        const x = landmark.x * canvas.width;
+                        const y = landmark.y * canvas.height;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 5, 0, 2 * Math.PI);
+                        ctx.fillStyle = 'red';
+                        ctx.fill();
+                    }
+                }
+            }
+            lastVideoTime = video.currentTime;
+        }
+        requestAnimationFrame(predictWebcam);
+    };
+
+    return predictWebcam;
+};
 
 interface RawRnnParams {
     in_projection: string;
@@ -169,10 +246,12 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
 
 export class Instrument extends HTMLElement {
     public url: string | null = null;
+    private initialized: boolean = false;
 
     constructor() {
         super();
         this.url = null;
+        this.initialized = false;
     }
 
     private render() {
@@ -233,27 +312,23 @@ export class Instrument extends HTMLElement {
 
         shadow.innerHTML = `
 <style>
-        div {
-            margin: 10px;
-        }
-        .instrument-container {
-            height: 200px;
-            cursor: pointer;
+
+        #video-container {
             position: relative;
-            -webkit-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
-            -moz-box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
-            box-shadow: 1px 11px 5px 5px rgba(0,0,0,0.23);
         }
-        .instrument-container.initialized {
-            background-color: #00ff00;
-        }
-        .current-event-vector {
+
+        #canvas-element, 
+        #video-element {
             position: absolute;
-            top: 10px;
-            left: 150px;
+            top: 0;
+            left: 0;
         }
-        p {
-            margin-left: 10px;
+
+        #video-container, 
+        #canvas-element, 
+        #video-element {
+            width: 500px;
+            height: 500px;
         }
 </style>
 <div class="instrument-container">
@@ -267,6 +342,11 @@ export class Instrument extends HTMLElement {
         <div class="current-event-vector" title="Most recent control-plane input vector">
             ${renderVector(currentControlPlaneVector)}
         </div>
+        <div id="video-container">
+            <video autoplay playsinline id="video-element"></video>
+            <canvas id="canvas-element" height="500" width="500"></canvas>
+        </div>
+        
 </div>
 `;
 
@@ -276,6 +356,27 @@ export class Instrument extends HTMLElement {
         const eventVectorContainer = shadow.querySelector(
             '.current-event-vector'
         );
+
+        // const video = shadow.querySelector('video') as HTMLVideoElement;
+
+        const prepareForVideo = async () => {
+            const landmarker = await createHandLandmarker();
+            const canvas = shadow.querySelector('canvas') as HTMLCanvasElement;
+            const ctx: CanvasRenderingContext2D = canvas.getContext('2d');
+            enableCam(shadow);
+
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx);
+
+            const video = shadow.querySelector('video');
+            video.addEventListener('loadeddata', () => {
+                loop();
+            });
+        };
+
+        if (!this.initialized) {
+            prepareForVideo();
+            this.initialized = true;
+        }
 
         const rnnWeightsUrl = this.url;
 
@@ -316,18 +417,8 @@ export class Instrument extends HTMLElement {
                     return zeros(64);
                 }
 
-                // return new Float32Array(64).map((x) =>
-                //     Math.random() > 0.9 ? (Math.random() * 2 - 1) * 10 : 0
-                // );
-
                 const proj = dotProduct(clickPoint, this.weights);
                 const sparse = relu(proj);
-                // console.log(
-                //     'CONTROL PLANE',
-                //     sparse,
-                //     this.weights.length,
-                //     this.weights[0].length
-                // );
                 return sparse;
             }
 
@@ -345,7 +436,7 @@ export class Instrument extends HTMLElement {
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
-                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.57/build/components/rnn.js'
+                        'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/rnn.js'
                     );
                 } catch (err) {
                     console.log(`Failed to add module due to ${err}`);
@@ -426,22 +517,7 @@ export class Instrument extends HTMLElement {
                     convUnit.triggerInstrument(arr, point);
                 }
             }
-
-            // updateCutoff(hz: number) {
-            //     for (const key in this.units) {
-            //         const u = this.units[key];
-            //         u.updateCutoff(hz);
-            //     }
-            // }
-
-            // async trigger(urls: string[], amplitude: number) {
-            //     urls.forEach((url) => {
-            //         this.units[url].trigger(amplitude);
-            //     });
-            // }
         }
-
-        // const activeNotes = new Set(['C']);
 
         const unit = new Controller(Object.values(notes));
 
@@ -453,13 +529,6 @@ export class Instrument extends HTMLElement {
 
                 const x = (event.clientX - rect.left) / rect.width;
                 const y = (event.clientY - rect.top) / rect.height;
-
-                // const width = container.clientWidth;
-                // const height = container.clientHeight;
-
-                // // // Get click coordinates in [0, 1]
-                // const x: number = event.offsetX / width;
-                // const y: number = event.offsetY / height;
 
                 // // Project click location to control plane space, followed by RELU
                 const point: Point = { x, y };
@@ -480,80 +549,80 @@ export class Instrument extends HTMLElement {
             }
         };
 
-        const useMouse = () => {
-            container.addEventListener('click', clickHandler);
+        // const useMouse = () => {
+        //     container.addEventListener('click', clickHandler);
 
-            // document.addEventListener(
-            //     'mousemove',
-            //     ({ movementX, movementY, clientX, clientY }) => {
-            //         if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
-            //             unit.trigger(
-            //                 Array.from(activeNotes).map((an) => notes[an]),
-            //                 1
-            //             );
-            //         }
+        //     // document.addEventListener(
+        //     //     'mousemove',
+        //     //     ({ movementX, movementY, clientX, clientY }) => {
+        //     //         if (Math.abs(movementX) > 10 || Math.abs(movementY) > 10) {
+        //     //             unit.trigger(
+        //     //                 Array.from(activeNotes).map((an) => notes[an]),
+        //     //                 1
+        //     //             );
+        //     //         }
 
-            //         const u = vertical.translateTo(clientY, unitInterval);
-            //         const hz = unitInterval.translateTo(u ** 2, filterCutoff);
-            //         unit.updateCutoff(hz);
-            //     }
-            // );
-        };
+        //     //         const u = vertical.translateTo(clientY, unitInterval);
+        //     //         const hz = unitInterval.translateTo(u ** 2, filterCutoff);
+        //     //         unit.updateCutoff(hz);
+        //     //     }
+        //     // );
+        // };
 
-        const useAcc = () => {
-            if (DeviceMotionEvent) {
-                window.addEventListener(
-                    'devicemotion',
-                    (event) => {
-                        const threshold: number = 10;
-                        /**
-                         * TODO:
-                         *
-                         * - settable thresholds for spacing in time as well as norm of motion
-                         * - project the 3D acceleration vector
-                         */
+        // const useAcc = () => {
+        //     if (DeviceMotionEvent) {
+        //         window.addEventListener(
+        //             'devicemotion',
+        //             (event) => {
+        //                 const threshold: number = 10;
+        //                 /**
+        //                  * TODO:
+        //                  *
+        //                  * - settable thresholds for spacing in time as well as norm of motion
+        //                  * - project the 3D acceleration vector
+        //                  */
 
-                        // threshold falls linearly, with a floor of 4
+        //                 // threshold falls linearly, with a floor of 4
 
-                        if (
-                            Math.abs(event.acceleration.x) > threshold ||
-                            Math.abs(event.acceleration.y) > threshold ||
-                            Math.abs(event.acceleration.z) > threshold
-                        ) {
-                            const accelerationVector = new Float32Array([
-                                event.acceleration.x,
-                                event.acceleration.y,
-                                event.acceleration.z,
-                            ]);
+        //                 if (
+        //                     Math.abs(event.acceleration.x) > threshold ||
+        //                     Math.abs(event.acceleration.y) > threshold ||
+        //                     Math.abs(event.acceleration.z) > threshold
+        //                 ) {
+        //                     const accelerationVector = new Float32Array([
+        //                         event.acceleration.x,
+        //                         event.acceleration.y,
+        //                         event.acceleration.z,
+        //                     ]);
 
-                            const controlPlane =
-                                unit.projectAcceleration(accelerationVector);
+        //                     const controlPlane =
+        //                         unit.projectAcceleration(accelerationVector);
 
-                            currentControlPlaneVector.set(controlPlane);
-                            eventVectorContainer.innerHTML = renderVector(
-                                currentControlPlaneVector
-                            );
+        //                     currentControlPlaneVector.set(controlPlane);
+        //                     eventVectorContainer.innerHTML = renderVector(
+        //                         currentControlPlaneVector
+        //                     );
 
-                            // TODO: The point argument is unused/unnecessary
-                            unit.triggerInstrument(controlPlane, {
-                                x: 0,
-                                y: 0,
-                            });
-                        }
-                    },
-                    true
-                );
-            } else {
-                console.log('Device motion not supported');
-                alert('device motion not supported');
-            }
-        };
+        //                     // TODO: The point argument is unused/unnecessary
+        //                     unit.triggerInstrument(controlPlane, {
+        //                         x: 0,
+        //                         y: 0,
+        //                     });
+        //                 }
+        //             },
+        //             true
+        //         );
+        //     } else {
+        //         console.log('Device motion not supported');
+        //         alert('device motion not supported');
+        //     }
+        // };
 
         start.addEventListener('click', async (event) => {
-            useAcc();
+            // useAcc();
             console.log('BEGINNING MONITORIING');
 
-            useMouse();
+            // useMouse();
 
             // TODO: How do I get to the button element here?
             // @ts-ignore
