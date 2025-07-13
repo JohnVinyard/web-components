@@ -40,6 +40,7 @@ const vectorSum = (vec: Float32Array): number => {
     return total;
 };
 
+
 const vectorScalarDivide = (
     vec: Float32Array,
     scalar: number
