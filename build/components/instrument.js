@@ -71,6 +71,12 @@ const sum = (a) => {
         return accum + current;
     }, 0);
 };
+const vectorScalarMultiply = (vec, scalar) => {
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] * scalar;
+    }
+    return vec;
+};
 const l1Norm = (a) => {
     return sum(a.map(Math.abs));
 };
@@ -148,7 +154,8 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
                     const rnnInput = dotProduct(newPosition, PROJECTION_MATRIX);
-                    inputTrigger(rnnInput);
+                    const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
+                    inputTrigger(relu(scaled));
                 }
                 lastPosition = newPosition;
             }
@@ -292,8 +299,8 @@ export class Instrument extends HTMLElement {
         #video-container, 
         #canvas-element, 
         #video-element {
-            width: 1000px;
-            height: 1000px;
+            width: 100vw;
+            height: 100vh;
         }
 
         video {

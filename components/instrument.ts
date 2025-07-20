@@ -60,23 +60,23 @@ const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
     }, 0);
 };
 
-const randomProjectionMatrix = (
-    shape: [number, number],
-    uniformDistributionMin: number,
-    uniformDistributionMax: number,
-    probability: number = 0.97
-): Float32Array[] => {
-    const totalElements = shape[0] * shape[1];
-    const span = uniformDistributionMax - uniformDistributionMin;
-    const mid = span / 2;
+// const randomProjectionMatrix = (
+//     shape: [number, number],
+//     uniformDistributionMin: number,
+//     uniformDistributionMax: number,
+//     probability: number = 0.97
+// ): Float32Array[] => {
+//     const totalElements = shape[0] * shape[1];
+//     const span = uniformDistributionMax - uniformDistributionMin;
+//     const mid = span / 2;
 
-    const rnd = zeros(totalElements).map((x) => {
-        return Math.random() * span - mid;
-    });
-    return twoDimArray(rnd, shape);
-};
+//     const rnd = zeros(totalElements).map((x) => {
+//         return Math.random() * span - mid;
+//     });
+//     return twoDimArray(rnd, shape);
+// };
 
-const PROJECTION_MATRIX = randomProjectionMatrix([128, 21], -1, 1, 0.5);
+// const PROJECTION_MATRIX = randomProjectionMatrix([128, 21], -1, 1, 0.5);
 // const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
 //     return a.map((value, index) => value + b[index]);
 // };
@@ -85,6 +85,16 @@ const sum = (a: Float32Array): number => {
     return a.reduce((accum, current) => {
         return accum + current;
     }, 0);
+};
+
+const vectorScalarMultiply = (
+    vec: Float32Array,
+    scalar: number
+): Float32Array => {
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] * scalar;
+    }
+    return vec;
 };
 
 const l1Norm = (a: Float32Array): number => {
@@ -146,6 +156,7 @@ const predictWebcamLoop = (
     canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     deltaThreshold: number,
+    projectionMatrix: Float32Array[],
     inputTrigger: (vec: Float32Array) => void
 ): (() => void) => {
     const predictWebcam = () => {
@@ -202,8 +213,9 @@ const predictWebcamLoop = (
 
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
-                    const rnnInput = dotProduct(newPosition, PROJECTION_MATRIX);
-                    inputTrigger(rnnInput);
+                    const rnnInput = dotProduct(newPosition, projectionMatrix);
+                    const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
+                    inputTrigger(relu(scaled));
                 }
 
                 lastPosition = newPosition;
@@ -223,6 +235,7 @@ interface RawRnnParams {
     rnn_out_projection: string;
     control_plane_mapping: string;
     accelerometer_mapping: string;
+    hand_tracking_mapping: string;
 }
 
 interface ArrayContainer {
@@ -237,6 +250,7 @@ interface RnnParams {
     rnnOutProjection: ArrayContainer;
     controlPlaneMapping: ArrayContainer;
     accelerometerMapping: ArrayContainer;
+    handTrackingMapping: ArrayContainer;
 }
 
 interface Point {
@@ -306,6 +320,7 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         rnn_out_projection,
         control_plane_mapping,
         accelerometer_mapping,
+        hand_tracking_mapping,
     } = data as RawRnnParams;
 
     const [inProjection, inProjectionShape] = fromNpy(
@@ -332,6 +347,10 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         base64ToArrayBuffer(accelerometer_mapping)
     );
 
+    const [handTrackingMapping, handTrackingShape] = fromNpy(
+        base64ToArrayBuffer(hand_tracking_mapping)
+    );
+
     return {
         inProjection: {
             array: inProjection as Float32Array,
@@ -356,6 +375,10 @@ const fetchRnnWeights = async (url: string): Promise<RnnParams> => {
         accelerometerMapping: {
             array: accelerometerMapping as Float32Array,
             shape: accelerometerMappingShape,
+        },
+        handTrackingMapping: {
+            array: handTrackingMapping as Float32Array,
+            shape: handTrackingShape,
         },
     };
 };
@@ -443,8 +466,8 @@ export class Instrument extends HTMLElement {
         #video-container, 
         #canvas-element, 
         #video-element {
-            width: 1000px;
-            height: 1000px;
+            width: 100vw;
+            height: 100vh;
         }
 
         video {
@@ -485,6 +508,7 @@ export class Instrument extends HTMLElement {
             private instrument: AudioWorkletNode | null = null;
             private weights: Float32Array[] | null = null;
             private accelerometerWeights: Float32Array[] | null;
+            public handTrackingWeights: Float32Array[] | null;
 
             constructor(public readonly url: string) {
                 this.url = url;
@@ -548,6 +572,11 @@ export class Instrument extends HTMLElement {
                         [64, 2]
                     );
 
+                    this.handTrackingWeights = twoDimArray(
+                        weights.handTrackingMapping.array,
+                        [128, 21]
+                    );
+
                     this.accelerometerWeights = twoDimArray(
                         weights.accelerometerMapping.array,
                         [64, 3]
@@ -586,6 +615,12 @@ export class Instrument extends HTMLElement {
                     accum[url] = new ConvUnit(url);
                     return accum;
                 }, {});
+            }
+
+            public get handTrackingWeights(): Float32Array[] {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                return convUnit.handTrackingWeights;
             }
 
             public projectAcceleration(vec: Float32Array): Float32Array {
@@ -633,6 +668,7 @@ export class Instrument extends HTMLElement {
                 canvas,
                 ctx,
                 0.25,
+                unit.handTrackingWeights,
                 (vec) => unit.triggerInstrument(vec)
             );
 
