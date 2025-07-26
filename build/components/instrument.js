@@ -23,6 +23,9 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
+const matrixShape = (matrix) => {
+    return [matrix.length, matrix[0].length];
+};
 const zeros = (size) => {
     return new Float32Array(size).fill(0);
 };
@@ -66,20 +69,20 @@ const PROJECTION_MATRIX = randomProjectionMatrix([128, 21], -1, 1, 0.5);
 // const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
 //     return a.map((value, index) => value + b[index]);
 // };
-const sum = (a) => {
-    return a.reduce((accum, current) => {
-        return accum + current;
-    }, 0);
-};
+// const sum = (a: Float32Array): number => {
+//     return a.reduce((accum, current) => {
+//         return accum + current;
+//     }, 0);
+// };
 const vectorScalarMultiply = (vec, scalar) => {
     for (let i = 0; i < vec.length; i++) {
         vec[i] = vec[i] * scalar;
     }
     return vec;
 };
-const l1Norm = (a) => {
-    return sum(a.map(Math.abs));
-};
+// const l1Norm = (a: Float32Array): number => {
+//     return sum(a.map(Math.abs));
+// };
 const l2Norm = (vec) => {
     let norm = 0;
     for (let i = 0; i < vec.length; i++) {
@@ -117,7 +120,7 @@ const enableCam = (shadowRoot
 });
 let lastVideoTime = 0;
 let lastPosition = new Float32Array(21);
-const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, inputTrigger) => {
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, projectionMatrix, inputTrigger) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
         canvas.width = video.videoWidth;
@@ -154,8 +157,10 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
                     const rnnInput = dotProduct(newPosition, PROJECTION_MATRIX);
-                    const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
-                    inputTrigger(relu(scaled));
+                    // const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
+                    // const rectified = relu(scaled);
+                    // console.log(`TRIGGERED: ${rectified}`);
+                    inputTrigger(rnnInput);
                 }
                 lastPosition = newPosition;
             }
@@ -207,13 +212,14 @@ const base64ToArrayBuffer = (base64) => {
 const fetchRnnWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
     const data = yield resp.json();
-    const { in_projection, out_projection, rnn_in_projection, rnn_out_projection, control_plane_mapping, accelerometer_mapping, } = data;
+    const { in_projection, out_projection, rnn_in_projection, rnn_out_projection, control_plane_mapping, accelerometer_mapping, hand_tracking_mapping, } = data;
     const [inProjection, inProjectionShape] = fromNpy(base64ToArrayBuffer(in_projection));
     const [outProjection, outProjectionShape] = fromNpy(base64ToArrayBuffer(out_projection));
     const [rnnInProjection, rnnInProjectionShape] = fromNpy(base64ToArrayBuffer(rnn_in_projection));
     const [rnnOutProjection, rnnOutProjectionShape] = fromNpy(base64ToArrayBuffer(rnn_out_projection));
     const [controlPlaneMapping, controlPlaneMappingShape] = fromNpy(base64ToArrayBuffer(control_plane_mapping));
     const [accelerometerMapping, accelerometerMappingShape] = fromNpy(base64ToArrayBuffer(accelerometer_mapping));
+    const [handTrackingMapping, handTrackingShape] = fromNpy(base64ToArrayBuffer(hand_tracking_mapping));
     return {
         inProjection: {
             array: inProjection,
@@ -238,6 +244,10 @@ const fetchRnnWeights = (url) => __awaiter(void 0, void 0, void 0, function* () 
         accelerometerMapping: {
             array: accelerometerMapping,
             shape: accelerometerMappingShape,
+        },
+        handTrackingMapping: {
+            array: handTrackingMapping,
+            shape: handTrackingShape,
         },
     };
 });
@@ -326,10 +336,12 @@ export class Instrument extends HTMLElement {
         
 </div>
 `;
-        const start = shadow.getElementById('start-demo');
-        const stop = shadow.getElementById('stop-demo');
+        // const start = shadow.getElementById('start-demo') as HTMLButtonElement;
+        // const stop = shadow.getElementById('stop-demo') as HTMLButtonElement;
         const container = shadow.querySelector('.instrument-container');
-        const eventVectorContainer = shadow.querySelector('.current-event-vector');
+        // const eventVectorContainer = shadow.querySelector(
+        //     '.current-event-vector'
+        // );
         class ConvUnit {
             constructor(url) {
                 this.url = url;
@@ -375,6 +387,9 @@ export class Instrument extends HTMLElement {
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
+                    if (this.initialized) {
+                        return;
+                    }
                     this.initialized = true;
                     const context = new AudioContext({
                         sampleRate: 22050,
@@ -391,7 +406,9 @@ export class Instrument extends HTMLElement {
                     try {
                         const weights = yield fetchRnnWeights(rnnWeightsUrl);
                         this.weights = twoDimArray(weights.controlPlaneMapping.array, [64, 2]);
+                        this.handTrackingWeights = twoDimArray(weights.handTrackingMapping.array, [64, 21]);
                         this.accelerometerWeights = twoDimArray(weights.accelerometerMapping.array, [64, 3]);
+                        console.log('HAND TRACKING WEIGHTS', this.handTrackingWeights);
                         const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                             processorOptions: weights,
                         });
@@ -419,22 +436,35 @@ export class Instrument extends HTMLElement {
                     return accum;
                 }, {});
             }
-            projectAcceleration(vec) {
+            initialize() {
+                return __awaiter(this, void 0, void 0, function* () {
+                    // this.units.forEach((unit) => unit.initialize());
+                    for (const key in this.units) {
+                        yield this.units[key].initialize();
+                    }
+                });
+            }
+            get handTrackingWeights() {
                 const key = notes['C'];
                 const convUnit = this.units[key];
-                if (convUnit) {
-                    return convUnit.projectAcceleration(vec);
-                }
-                return zeros(64);
+                return convUnit.handTrackingWeights;
             }
-            projectClick(point) {
-                const key = notes['C'];
-                const convUnit = this.units[key];
-                if (convUnit) {
-                    return convUnit.projectClick(point);
-                }
-                return zeros(64);
-            }
+            // public projectAcceleration(vec: Float32Array): Float32Array {
+            //     const key = notes['C'];
+            //     const convUnit = this.units[key];
+            //     if (convUnit) {
+            //         return convUnit.projectAcceleration(vec);
+            //     }
+            //     return zeros(64);
+            // }
+            // public projectClick(point: Float32Array): Float32Array {
+            //     const key = notes['C'];
+            //     const convUnit = this.units[key];
+            //     if (convUnit) {
+            //         return convUnit.projectClick(point);
+            //     }
+            //     return zeros(64);
+            // }
             triggerInstrument(arr) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
@@ -450,45 +480,48 @@ export class Instrument extends HTMLElement {
             const canvas = shadow.querySelector('canvas');
             const ctx = canvas.getContext('2d');
             enableCam(shadow);
-            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, (vec) => unit.triggerInstrument(vec));
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, unit.handTrackingWeights, (vec) => unit.triggerInstrument(vec));
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {
                 loop();
             });
         });
         if (!this.initialized) {
+            unit.initialize();
             prepareForVideo();
             this.initialized = true;
         }
         const rnnWeightsUrl = this.url;
-        const clickHandler = (event) => {
-            console.log('CLICKED WITH', unit);
-            if (unit) {
-                const rect = container.getBoundingClientRect();
-                const x = (event.clientX - rect.left) / rect.width;
-                const y = (event.clientY - rect.top) / rect.height;
-                // // Project click location to control plane space, followed by RELU
-                const point = { x, y };
-                const pointArr = pointToArray(point);
-                console.log(pointArr);
-                const pos = unit.projectClick(pointArr);
-                currentControlPlaneVector.set(pos);
-                eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
-                unit.triggerInstrument(pos);
-            }
-        };
-        start.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
-            console.log('BEGINNING MONITORIING');
-            // TODO: How do I get to the button element here?
-            // @ts-ignore
-            event.target.disabled = true;
-            stop.disabled = false;
-        }));
-        stop.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
-            stop.disabled = true;
-            start.disabled = false;
-            container.removeEventListener('click', clickHandler);
-        }));
+        // const clickHandler = (event: MouseEvent) => {
+        //     console.log('CLICKED WITH', unit);
+        //     if (unit) {
+        //         const rect = container.getBoundingClientRect();
+        //         const x = (event.clientX - rect.left) / rect.width;
+        //         const y = (event.clientY - rect.top) / rect.height;
+        //         // // Project click location to control plane space, followed by RELU
+        //         const point: Point = { x, y };
+        //         const pointArr = pointToArray(point);
+        //         console.log(pointArr);
+        //         const pos = unit.projectClick(pointArr);
+        //         currentControlPlaneVector.set(pos);
+        //         eventVectorContainer.innerHTML = renderVector(
+        //             currentControlPlaneVector
+        //         );
+        //         unit.triggerInstrument(pos);
+        //     }
+        // };
+        // start.addEventListener('click', async (event) => {
+        //     console.log('BEGINNING MONITORIING');
+        //     // TODO: How do I get to the button element here?
+        //     // @ts-ignore
+        //     event.target.disabled = true;
+        //     stop.disabled = false;
+        // });
+        // stop.addEventListener('click', async (event) => {
+        //     stop.disabled = true;
+        //     start.disabled = false;
+        //     container.removeEventListener('click', clickHandler);
+        // });
     }
     connectedCallback() {
         this.render();
