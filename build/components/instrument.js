@@ -122,7 +122,9 @@ const enableCam = (shadowRoot
 });
 let lastVideoTime = 0;
 let lastPosition = new Float32Array(21);
-const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, projectionMatrix, inputTrigger) => {
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, unit, 
+// projectionMatrix: Float32Array[],
+inputTrigger) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
         canvas.width = video.videoWidth;
@@ -158,9 +160,12 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                 const delta = elementwiseDifference(newPosition, lastPosition, output);
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
-                    const rnnInput = dotProduct(newPosition, projectionMatrix);
-                    console.log(rnnInput);
-                    inputTrigger(rnnInput);
+                    const matrix = unit.handTrackingWeights;
+                    if (matrix) {
+                        const rnnInput = dotProduct(newPosition, matrix);
+                        console.log(rnnInput);
+                        inputTrigger(rnnInput);
+                    }
                 }
                 lastPosition = newPosition;
             }
@@ -350,7 +355,13 @@ export class Instrument extends HTMLElement {
                 this.weights = null;
                 this.handTrackingWeights = null;
                 this.url = url;
-                this.handTrackingWeights = randomProjectionMatrix([64, 21], -1, 1, 0.5);
+                // this.handTrackingWeights = randomProjectionMatrix(
+                //     [64, 21],
+                //     -1,
+                //     1,
+                //     0.5
+                // );
+                this.handTrackingWeights = zerosMatrix([64, 21]);
             }
             triggerInstrument(arr) {
                 var _a;
@@ -476,7 +487,7 @@ export class Instrument extends HTMLElement {
             const canvas = shadow.querySelector('canvas');
             const ctx = canvas.getContext('2d');
             enableCam(shadow);
-            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, unit.handTrackingWeights, (vec) => unit.triggerInstrument(vec));
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, unit, (vec) => unit.triggerInstrument(vec));
             console.log('SET UP LOOP');
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {

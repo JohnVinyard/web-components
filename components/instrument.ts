@@ -120,6 +120,10 @@ const zerosLike = (x: Float32Array): Float32Array => {
     return new Float32Array(x.length).fill(0);
 };
 
+interface HasWeights {
+    handTrackingWeights: Float32Array[] | null;
+}
+
 const createHandLandmarker = async (): Promise<HandLandmarker> => {
     const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
@@ -163,7 +167,8 @@ const predictWebcamLoop = (
     canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     deltaThreshold: number,
-    projectionMatrix: Float32Array[],
+    unit: HasWeights,
+    // projectionMatrix: Float32Array[],
     inputTrigger: (vec: Float32Array) => void
 ): (() => void) => {
     const predictWebcam = () => {
@@ -220,9 +225,12 @@ const predictWebcamLoop = (
 
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
-                    const rnnInput = dotProduct(newPosition, projectionMatrix);
-                    console.log(rnnInput);
-                    inputTrigger(rnnInput);
+                    const matrix = unit.handTrackingWeights;
+                    if (matrix) {
+                        const rnnInput = dotProduct(newPosition, matrix);
+                        console.log(rnnInput);
+                        inputTrigger(rnnInput);
+                    }
                 }
 
                 lastPosition = newPosition;
@@ -508,7 +516,7 @@ export class Instrument extends HTMLElement {
             '.current-event-vector'
         );
 
-        class ConvUnit {
+        class ConvUnit implements HasWeights {
             private initialized: boolean = false;
             // private gain: GainNode | null = null;
             // private filt: BiquadFilterNode | null = null;
@@ -519,7 +527,13 @@ export class Instrument extends HTMLElement {
 
             constructor(public readonly url: string) {
                 this.url = url;
-                this.handTrackingWeights = randomProjectionMatrix([64, 21], -1, 1, 0.5);
+                // this.handTrackingWeights = randomProjectionMatrix(
+                //     [64, 21],
+                //     -1,
+                //     1,
+                //     0.5
+                // );
+                this.handTrackingWeights = zerosMatrix([64, 21]);
             }
 
             public async triggerInstrument(arr: Float32Array) {
@@ -616,7 +630,7 @@ export class Instrument extends HTMLElement {
             // B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
         };
 
-        class Controller {
+        class Controller implements HasWeights {
             private readonly units: Record<string, ConvUnit>;
 
             constructor(urls: string[]) {
@@ -632,7 +646,7 @@ export class Instrument extends HTMLElement {
                 }
             }
 
-            public get handTrackingWeights(): Float32Array[] {
+            public get handTrackingWeights(): Float32Array[] | null {
                 const key = notes['C'];
                 const convUnit = this.units[key];
                 return convUnit.handTrackingWeights;
@@ -675,7 +689,7 @@ export class Instrument extends HTMLElement {
             const landmarker = await createHandLandmarker();
             const canvas = shadow.querySelector('canvas') as HTMLCanvasElement;
             const ctx: CanvasRenderingContext2D = canvas.getContext('2d');
-            
+
             enableCam(shadow);
 
             const loop = predictWebcamLoop(
@@ -684,7 +698,7 @@ export class Instrument extends HTMLElement {
                 canvas,
                 ctx,
                 0.25,
-                unit.handTrackingWeights,
+                unit,
                 (vec) => unit.triggerInstrument(vec)
             );
 
