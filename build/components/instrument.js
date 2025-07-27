@@ -23,11 +23,13 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
-const matrixShape = (matrix) => {
-    return [matrix.length, matrix[0].length];
-};
 const zeros = (size) => {
     return new Float32Array(size).fill(0);
+};
+const zerosMatrix = (shape) => {
+    const total = shape[0] * shape[1];
+    const z = zeros(total);
+    return twoDimArray(z, shape);
 };
 const argMax = (vec) => {
     let index = 0;
@@ -65,24 +67,24 @@ const randomProjectionMatrix = (shape, uniformDistributionMin, uniformDistributi
     });
     return twoDimArray(rnd, shape);
 };
-const PROJECTION_MATRIX = randomProjectionMatrix([128, 21], -1, 1, 0.5);
+// const PROJECTION_MATRIX = randomProjectionMatrix([64, 21], -1, 1, 0.5);
 // const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
 //     return a.map((value, index) => value + b[index]);
 // };
-// const sum = (a: Float32Array): number => {
-//     return a.reduce((accum, current) => {
-//         return accum + current;
-//     }, 0);
-// };
-const vectorScalarMultiply = (vec, scalar) => {
+const vectorScalarMultiply = (vec, scalar, out) => {
     for (let i = 0; i < vec.length; i++) {
-        vec[i] = vec[i] * scalar;
+        out[i] = vec[i] * scalar;
     }
-    return vec;
+    return out;
 };
-// const l1Norm = (a: Float32Array): number => {
-//     return sum(a.map(Math.abs));
-// };
+const sum = (a) => {
+    return a.reduce((accum, current) => {
+        return accum + current;
+    }, 0);
+};
+const l1Norm = (a) => {
+    return sum(a.map(Math.abs));
+};
 const l2Norm = (vec) => {
     let norm = 0;
     for (let i = 0; i < vec.length; i++) {
@@ -156,10 +158,8 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                 const delta = elementwiseDifference(newPosition, lastPosition, output);
                 const deltaNorm = l2Norm(delta);
                 if (deltaNorm > deltaThreshold) {
-                    const rnnInput = dotProduct(newPosition, PROJECTION_MATRIX);
-                    // const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
-                    // const rectified = relu(scaled);
-                    // console.log(`TRIGGERED: ${rectified}`);
+                    const rnnInput = dotProduct(newPosition, projectionMatrix);
+                    console.log(rnnInput);
                     inputTrigger(rnnInput);
                 }
                 lastPosition = newPosition;
@@ -309,8 +309,8 @@ export class Instrument extends HTMLElement {
         #video-container, 
         #canvas-element, 
         #video-element {
-            width: 100vw;
-            height: 100vh;
+            width: 1000px;
+            height: 1000px;
         }
 
         video {
@@ -336,12 +336,10 @@ export class Instrument extends HTMLElement {
         
 </div>
 `;
-        // const start = shadow.getElementById('start-demo') as HTMLButtonElement;
-        // const stop = shadow.getElementById('stop-demo') as HTMLButtonElement;
+        const start = shadow.getElementById('start-demo');
+        const stop = shadow.getElementById('stop-demo');
         const container = shadow.querySelector('.instrument-container');
-        // const eventVectorContainer = shadow.querySelector(
-        //     '.current-event-vector'
-        // );
+        const eventVectorContainer = shadow.querySelector('.current-event-vector');
         class ConvUnit {
             constructor(url) {
                 this.url = url;
@@ -350,7 +348,9 @@ export class Instrument extends HTMLElement {
                 // private filt: BiquadFilterNode | null = null;
                 this.instrument = null;
                 this.weights = null;
+                this.handTrackingWeights = null;
                 this.url = url;
+                this.handTrackingWeights = randomProjectionMatrix([64, 21], -1, 1, 0.5);
             }
             triggerInstrument(arr) {
                 var _a;
@@ -387,9 +387,6 @@ export class Instrument extends HTMLElement {
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
-                    if (this.initialized) {
-                        return;
-                    }
                     this.initialized = true;
                     const context = new AudioContext({
                         sampleRate: 22050,
@@ -406,14 +403,14 @@ export class Instrument extends HTMLElement {
                     try {
                         const weights = yield fetchRnnWeights(rnnWeightsUrl);
                         this.weights = twoDimArray(weights.controlPlaneMapping.array, [64, 2]);
-                        this.handTrackingWeights = twoDimArray(weights.handTrackingMapping.array, [64, 21]);
                         this.accelerometerWeights = twoDimArray(weights.accelerometerMapping.array, [64, 3]);
-                        console.log('HAND TRACKING WEIGHTS', this.handTrackingWeights);
+                        this.handTrackingWeights = twoDimArray(weights.handTrackingMapping.array, [64, 21]);
                         const whiteNoise = new AudioWorkletNode(context, 'rnn-instrument', {
                             processorOptions: weights,
                         });
                         whiteNoise.connect(context.destination);
                         this.instrument = whiteNoise;
+                        console.log('INSTRUMENT INITIALIZED');
                     }
                     catch (err) {
                         console.log('Failed to initialize instrument');
@@ -425,9 +422,9 @@ export class Instrument extends HTMLElement {
         }
         const notes = {
             C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
-            E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
-            G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
-            B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
+            // E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
+            // G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
+            // B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
         };
         class Controller {
             constructor(urls) {
@@ -438,7 +435,6 @@ export class Instrument extends HTMLElement {
             }
             initialize() {
                 return __awaiter(this, void 0, void 0, function* () {
-                    // this.units.forEach((unit) => unit.initialize());
                     for (const key in this.units) {
                         yield this.units[key].initialize();
                     }
@@ -449,22 +445,22 @@ export class Instrument extends HTMLElement {
                 const convUnit = this.units[key];
                 return convUnit.handTrackingWeights;
             }
-            // public projectAcceleration(vec: Float32Array): Float32Array {
-            //     const key = notes['C'];
-            //     const convUnit = this.units[key];
-            //     if (convUnit) {
-            //         return convUnit.projectAcceleration(vec);
-            //     }
-            //     return zeros(64);
-            // }
-            // public projectClick(point: Float32Array): Float32Array {
-            //     const key = notes['C'];
-            //     const convUnit = this.units[key];
-            //     if (convUnit) {
-            //         return convUnit.projectClick(point);
-            //     }
-            //     return zeros(64);
-            // }
+            projectAcceleration(vec) {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    return convUnit.projectAcceleration(vec);
+                }
+                return zeros(64);
+            }
+            projectClick(point) {
+                const key = notes['C'];
+                const convUnit = this.units[key];
+                if (convUnit) {
+                    return convUnit.projectClick(point);
+                }
+                return zeros(64);
+            }
             triggerInstrument(arr) {
                 const key = notes['C'];
                 const convUnit = this.units[key];
@@ -481,47 +477,45 @@ export class Instrument extends HTMLElement {
             const ctx = canvas.getContext('2d');
             enableCam(shadow);
             const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, unit.handTrackingWeights, (vec) => unit.triggerInstrument(vec));
+            console.log('SET UP LOOP');
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {
                 loop();
             });
         });
         if (!this.initialized) {
-            unit.initialize();
             prepareForVideo();
             this.initialized = true;
         }
         const rnnWeightsUrl = this.url;
-        // const clickHandler = (event: MouseEvent) => {
-        //     console.log('CLICKED WITH', unit);
-        //     if (unit) {
-        //         const rect = container.getBoundingClientRect();
-        //         const x = (event.clientX - rect.left) / rect.width;
-        //         const y = (event.clientY - rect.top) / rect.height;
-        //         // // Project click location to control plane space, followed by RELU
-        //         const point: Point = { x, y };
-        //         const pointArr = pointToArray(point);
-        //         console.log(pointArr);
-        //         const pos = unit.projectClick(pointArr);
-        //         currentControlPlaneVector.set(pos);
-        //         eventVectorContainer.innerHTML = renderVector(
-        //             currentControlPlaneVector
-        //         );
-        //         unit.triggerInstrument(pos);
-        //     }
-        // };
-        // start.addEventListener('click', async (event) => {
-        //     console.log('BEGINNING MONITORIING');
-        //     // TODO: How do I get to the button element here?
-        //     // @ts-ignore
-        //     event.target.disabled = true;
-        //     stop.disabled = false;
-        // });
-        // stop.addEventListener('click', async (event) => {
-        //     stop.disabled = true;
-        //     start.disabled = false;
-        //     container.removeEventListener('click', clickHandler);
-        // });
+        const clickHandler = (event) => {
+            console.log('CLICKED WITH', unit);
+            if (unit) {
+                const rect = container.getBoundingClientRect();
+                const x = (event.clientX - rect.left) / rect.width;
+                const y = (event.clientY - rect.top) / rect.height;
+                // // Project click location to control plane space, followed by RELU
+                const point = { x, y };
+                const pointArr = pointToArray(point);
+                console.log(pointArr);
+                const pos = unit.projectClick(pointArr);
+                currentControlPlaneVector.set(pos);
+                eventVectorContainer.innerHTML = renderVector(currentControlPlaneVector);
+                unit.triggerInstrument(pos);
+            }
+        };
+        start.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
+            console.log('BEGINNING MONITORIING');
+            // TODO: How do I get to the button element here?
+            // @ts-ignore
+            event.target.disabled = true;
+            stop.disabled = false;
+        }));
+        stop.addEventListener('click', (event) => __awaiter(this, void 0, void 0, function* () {
+            stop.disabled = true;
+            start.disabled = false;
+            container.removeEventListener('click', clickHandler);
+        }));
     }
     connectedCallback() {
         this.render();
