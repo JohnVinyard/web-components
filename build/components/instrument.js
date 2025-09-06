@@ -394,8 +394,8 @@ export class Instrument extends HTMLElement {
         #video-container, 
         #canvas-element, 
         #video-element {
-            width: 1000px;
-            height: 700px;
+            width: 800px;
+            height: 800px;
         }
 
         video {
