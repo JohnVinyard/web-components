@@ -35,29 +35,39 @@ const zerosMatrix = (shape: [number, number]): Float32Array[] => {
     return twoDimArray(z, shape);
 };
 
-const argMax = (vec: Float32Array): number => {
-    let index = 0;
-    let value = Number.MIN_VALUE;
+// const argMax = (vec: Float32Array): number => {
+//     let index = 0;
+//     let value = Number.MIN_VALUE;
+//     for (let i = 0; i < vec.length; i++) {
+//         if (vec[i] > value) {
+//             index = i;
+//             value = vec[i];
+//         }
+//     }
+//     return index;
+// };
+
+// const oneHot = (vec: Float32Array): Float32Array => {
+//     const mx = vec.map((x) => Math.abs(x));
+//     const index = argMax(mx);
+
+//     const sparse = zeros(vec.length).map((x, i) => {
+//         if (index === i) {
+//             return x;
+//         }
+//         return 0;
+//     });
+//     return sparse;
+// };
+
+const threshold = (vec: Float32Array, threshold: number): Float32Array => {
+    const output = zerosLike(vec);
     for (let i = 0; i < vec.length; i++) {
-        if (vec[i] > value) {
-            index = i;
-            value = vec[i];
+        if (vec[i] > threshold) {
+            output[i] = vec[i];
         }
     }
-    return index;
-};
-
-const oneHot = (vec: Float32Array): Float32Array => {
-    const mx = vec.map((x) => Math.abs(x));
-    const index = argMax(mx);
-
-    const sparse = zeros(vec.length).map((x, i) => {
-        if (index === i) {
-            return x;
-        }
-        return 0;
-    });
-    return sparse;
+    return output;
 };
 
 const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
@@ -82,20 +92,29 @@ const randomProjectionMatrix = (
     return twoDimArray(rnd, shape);
 };
 
-// const PROJECTION_MATRIX = randomProjectionMatrix([64, 21], -1, 1, 0.5);
+const PROJECTION_MATRIX = randomProjectionMatrix([64, 21 * 3], -1, 1, 0.5);
 // const elementwiseSum = (a: Float32Array, b: Float32Array): Float32Array => {
 //     return a.map((value, index) => value + b[index]);
 // };
 
 const vectorScalarMultiply = (
     vec: Float32Array,
-    scalar: number,
-    out: Float32Array
+    scalar: number
 ): Float32Array => {
     for (let i = 0; i < vec.length; i++) {
-        out[i] = vec[i] * scalar;
+        vec[i] = vec[i] * scalar;
     }
-    return out;
+    return vec;
+};
+
+const vectorScalarExponent = (
+    vec: Float32Array,
+    scalar: number
+): Float32Array => {
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] ** scalar;
+    }
+    return vec;
 };
 
 const sum = (a: Float32Array): number => {
@@ -159,7 +178,44 @@ const enableCam = async (
 
 let lastVideoTime: number = 0;
 
-let lastPosition = new Float32Array(21);
+let lastPosition = new Float32Array(21 * 3);
+
+const colorScheme = [
+    // Coral / Pink Tones
+    'rgb(255, 99, 130)', // Coral Pink
+    'rgb(255, 143, 160)', // Blush
+    'rgb(255, 181, 194)', // Light Rose
+
+    // Warm Yellows / Oranges
+    'rgb(255, 207, 64)', // Honey Yellow
+    'rgb(255, 179, 71)', // Soft Orange
+    'rgb(255, 222, 130)', // Pale Gold
+
+    // Greens
+    'rgb(72, 207, 173)', // Mint Green
+    'rgb(112, 219, 182)', // Soft Seafoam
+    'rgb(186, 242, 203)', // Pastel Green
+
+    // Blues
+    'rgb(64, 153, 255)', // Sky Blue
+    'rgb(108, 189, 255)', // Light Blue
+    'rgb(179, 220, 255)', // Pale Azure
+
+    // Purples
+    'rgb(149, 117, 205)', // Lavender Purple
+    'rgb(178, 145, 220)', // Soft Lilac
+    'rgb(210, 190, 245)', // Pale Violet
+
+    // Neutrals
+    'rgb(240, 240, 240)', // Light Gray
+    'rgb(200, 200, 200)', // Medium Gray
+    'rgb(160, 160, 160)', // Soft Charcoal
+    'rgb(100, 100, 100)', // Dark Gray
+    'rgb(33, 33, 33)', // Deep Charcoal
+
+    // Accent
+    'rgb(255, 255, 255)', // White (highlight or background contrast)
+];
 
 const predictWebcamLoop = (
     shadowRoot: ShadowRoot,
@@ -178,6 +234,8 @@ const predictWebcamLoop = (
         canvas.height = video.videoHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        const output = zerosLike(lastPosition);
+
         let startTimeMs = performance.now();
         if (lastVideoTime !== video.currentTime) {
             const detections = handLandmarker.detectForVideo(
@@ -192,27 +250,34 @@ const predictWebcamLoop = (
 
             // Process and draw landmarks from 'detections'
             if (detections.landmarks) {
-                const newPosition = new Float32Array(21);
-                const output = zerosLike(newPosition);
+                const newPosition = new Float32Array(21 * 3);
                 let vecPos = 0;
 
                 for (let i = 0; i < detections.landmarks.length; i++) {
                     const landmarks = detections.landmarks[i];
+                    const wl = detections.worldLandmarks[i];
 
                     for (let j = 0; j < landmarks.length; j++) {
                         const landmark = landmarks[j];
+                        const wll = wl[j];
 
-                        newPosition[vecPos] = landmark.x;
-                        newPosition[vecPos + 1] = landmark.y;
+                        // TODO: This determines whether we're using
+                        // screen-space or world-space
+                        const mappingVector = landmark;
+
+                        // TODO: This is assuming values in [0, 1]
+                        newPosition[vecPos] = mappingVector.x * 2 - 1;
+                        newPosition[vecPos + 1] = mappingVector.y * 2 - 1;
+                        newPosition[vecPos + 2] = mappingVector.z * 2 - 1;
 
                         const x = landmark.x * canvas.width;
                         const y = landmark.y * canvas.height;
 
-                        vecPos += 2;
+                        vecPos += 3;
 
                         ctx.beginPath();
                         ctx.arc(x, y, 3.5, 0, 2 * Math.PI);
-                        ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+                        ctx.fillStyle = colorScheme[j];
                         ctx.fill();
                     }
                 }
@@ -224,12 +289,18 @@ const predictWebcamLoop = (
                 );
 
                 const deltaNorm = l2Norm(delta);
+                // TODO: threshold should be based on movement of individual points
+                // rather than the norm of the delta
                 if (deltaNorm > deltaThreshold) {
                     const matrix = unit.handTrackingWeights;
                     if (matrix) {
-                        const rnnInput = dotProduct(newPosition, matrix);
-                        console.log(rnnInput);
-                        inputTrigger(rnnInput);
+                        // project the position of all points to the rnn input
+                        // dimensions
+                        const rnnInput = dotProduct(delta, matrix);
+                        // const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
+                        const sp = relu(rnnInput);
+
+                        inputTrigger(sp);
                     }
                 }
 
@@ -314,6 +385,28 @@ const dotProduct = (
 
 const relu = (vector: Float32Array): Float32Array => {
     return vector.map((x) => Math.max(0, x));
+};
+
+const argMax = (vector: Float32Array): number => {
+    let index = 0;
+    let mx = Number.MIN_VALUE;
+    for (let i = 0; i < vector.length; i++) {
+        if (vector[i] > mx) {
+            mx = vector[i];
+            index = i;
+        }
+    }
+    return index;
+};
+
+const oneHot = (vector: Float32Array): Float32Array => {
+    const mx = argMax(vector);
+    for (let i = 0; i < vector.length; i++) {
+        if (i !== mx) {
+            vector[i] = 0;
+        }
+    }
+    return vector;
 };
 
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
@@ -415,9 +508,9 @@ export class Instrument extends HTMLElement {
             shadow = this.attachShadow({ mode: 'open' });
         }
 
-        const currentControlPlaneVector: Float32Array = new Float32Array(
-            64
-        ).fill(Math.random() * 1e-3);
+        // const currentControlPlaneVector: Float32Array = new Float32Array(
+        //     64
+        // ).fill(Math.random() * 1e-3);
 
         const renderVector = (
             currentControlPlaneVector: Float32Array
@@ -458,6 +551,7 @@ export class Instrument extends HTMLElement {
                                 width="${vectorElementWidth}" 
                                 height="${vectorElementHeight}"
                                 fill="${valueToRgb(x)}"
+                                stroke="black"
                             />`
                     )
                     .join('')}
@@ -482,7 +576,7 @@ export class Instrument extends HTMLElement {
         #canvas-element, 
         #video-element {
             width: 1000px;
-            height: 1000px;
+            height: 700px;
         }
 
         video {
@@ -491,15 +585,8 @@ export class Instrument extends HTMLElement {
         }
 </style>
 <div class="instrument-container">
-        <div>
-            <button id="start-demo">Start Demo</button>
-            <button id="stop-demo" disabled>Stop</button>
-        </div>
-        <p>
-            Sparse control-plane vectors are chosen at random when you click
-        </p>
         <div class="current-event-vector" title="Most recent control-plane input vector">
-            ${renderVector(currentControlPlaneVector)}
+            ${renderVector(zeros(64))}
         </div>
         <div id="video-container">
             <video autoplay playsinline id="video-element"></video>
@@ -509,17 +596,10 @@ export class Instrument extends HTMLElement {
 </div>
 `;
 
-        const start = shadow.getElementById('start-demo') as HTMLButtonElement;
-        const stop = shadow.getElementById('stop-demo') as HTMLButtonElement;
         const container = shadow.querySelector('.instrument-container');
-        const eventVectorContainer = shadow.querySelector(
-            '.current-event-vector'
-        );
 
         class ConvUnit implements HasWeights {
             private initialized: boolean = false;
-            // private gain: GainNode | null = null;
-            // private filt: BiquadFilterNode | null = null;
             private instrument: AudioWorkletNode | null = null;
             private weights: Float32Array[] | null = null;
             private accelerometerWeights: Float32Array[] | null;
@@ -527,12 +607,6 @@ export class Instrument extends HTMLElement {
 
             constructor(public readonly url: string) {
                 this.url = url;
-                // this.handTrackingWeights = randomProjectionMatrix(
-                //     [64, 21],
-                //     -1,
-                //     1,
-                //     0.5
-                // );
                 this.handTrackingWeights = zerosMatrix([64, 21]);
             }
 
@@ -577,6 +651,17 @@ export class Instrument extends HTMLElement {
                     sampleRate: 22050,
                 });
 
+                const convNode = context.createConvolver();
+                convNode.buffer = await fetch(
+                    'https://matching-pursuit-reverbs.s3.amazonaws.com/Small Prehistoric Cave.wav'
+                )
+                    .then((resp) => resp.arrayBuffer())
+                    .then((x) => {
+                        const audio = context.decodeAudioData(x);
+                        return audio;
+                    });
+                // convNode.
+
                 try {
                     await context.audioWorklet.addModule(
                         // '/build/components/rnn.js'
@@ -601,8 +686,9 @@ export class Instrument extends HTMLElement {
 
                     this.handTrackingWeights = twoDimArray(
                         weights.handTrackingMapping.array,
-                        [64, 21]
+                        [64, 21 * 3]
                     );
+                    // this.handTrackingWeights = PROJECTION_MATRIX;
 
                     const whiteNoise = new AudioWorkletNode(
                         context,
@@ -611,7 +697,9 @@ export class Instrument extends HTMLElement {
                             processorOptions: weights,
                         }
                     );
-                    whiteNoise.connect(context.destination);
+                    whiteNoise.connect(convNode);
+                    // whiteNoise.connect(context.destination);
+                    convNode.connect(context.destination);
                     this.instrument = whiteNoise;
                     console.log('INSTRUMENT INITIALIZED');
                 } catch (err) {
@@ -625,9 +713,6 @@ export class Instrument extends HTMLElement {
 
         const notes: Record<string, string> = {
             C: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-036-100',
-            // E: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-040-127',
-            // G: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-043-100',
-            // B: 'https://nsynth.s3.amazonaws.com/bass_electronic_018-047-100',
         };
 
         class Controller implements HasWeights {
@@ -683,14 +768,20 @@ export class Instrument extends HTMLElement {
 
         const unit = new Controller(Object.values(notes));
 
-        // const video = shadow.querySelector('video') as HTMLVideoElement;
-
         const prepareForVideo = async () => {
             const landmarker = await createHandLandmarker();
             const canvas = shadow.querySelector('canvas') as HTMLCanvasElement;
             const ctx: CanvasRenderingContext2D = canvas.getContext('2d');
 
             enableCam(shadow);
+
+            const onTrigger = (vec: Float32Array) => {
+                unit.triggerInstrument(vec);
+                const eventVectorContainer = shadow.querySelector(
+                    '.current-event-vector'
+                );
+                eventVectorContainer.innerHTML = renderVector(vec);
+            };
 
             const loop = predictWebcamLoop(
                 shadow,
@@ -699,10 +790,8 @@ export class Instrument extends HTMLElement {
                 ctx,
                 0.25,
                 unit,
-                (vec) => unit.triggerInstrument(vec)
+                onTrigger
             );
-
-            console.log('SET UP LOOP');
 
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {
@@ -716,47 +805,6 @@ export class Instrument extends HTMLElement {
         }
 
         const rnnWeightsUrl = this.url;
-
-        const clickHandler = (event: MouseEvent) => {
-            console.log('CLICKED WITH', unit);
-
-            if (unit) {
-                const rect = container.getBoundingClientRect();
-
-                const x = (event.clientX - rect.left) / rect.width;
-                const y = (event.clientY - rect.top) / rect.height;
-
-                // // Project click location to control plane space, followed by RELU
-                const point: Point = { x, y };
-                const pointArr = pointToArray(point);
-                console.log(pointArr);
-
-                const pos = unit.projectClick(pointArr);
-
-                currentControlPlaneVector.set(pos);
-
-                eventVectorContainer.innerHTML = renderVector(
-                    currentControlPlaneVector
-                );
-
-                unit.triggerInstrument(pos);
-            }
-        };
-
-        start.addEventListener('click', async (event) => {
-            console.log('BEGINNING MONITORIING');
-
-            // TODO: How do I get to the button element here?
-            // @ts-ignore
-            event.target.disabled = true;
-            stop.disabled = false;
-        });
-
-        stop.addEventListener('click', async (event) => {
-            stop.disabled = true;
-            start.disabled = false;
-            container.removeEventListener('click', clickHandler);
-        });
     }
 
     public connectedCallback() {
