@@ -18,9 +18,7 @@ const zerosLike = (x) => {
 const randomLike = (x, magnitude = 1) => {
     return zerosLike(x).map((x) => Math.random() * magnitude - magnitude / 2);
 };
-// TODO: re-implement as for-loop
 const vectorSum = (vec) => {
-    // return vec.reduce((accum, current) => accum + current, 0);
     let total = 0;
     for (let i = 0; i < vec.length; i++) {
         total += vec[i];

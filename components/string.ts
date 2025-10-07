@@ -36,14 +36,28 @@ const pointsEqual = (p1: Float32Array, p2: Float32Array): boolean => {
     return p1[0] == p2[0] && p1[1] == p2[1];
 };
 
+const distance = (a: Float32Array, b: Float32Array): number => {
+    let distance = 0;
+    for (let i = 0; i < a.length; i++) {
+        distance += (a[i] - b[i]) ** 2;
+    }
+    return Math.sqrt(distance);
+};
+
 export class PhysicalStringSimulation extends HTMLElement {
     private initialized: boolean = false;
     private node: AudioWorkletNode | null = null;
     private mostRecentlyStruck: Float32Array | null;
     private isUsingAccelerometer: boolean = false;
+    private massPosition: Float32Array = new Float32Array(2);
+
+    private mass: number = 1;
+    private meshInfo: MeshInfo | null = null;
 
     constructor() {
         super();
+
+        this.massPosition = new Float32Array([0, 0]);
     }
 
     private render() {
@@ -160,6 +174,24 @@ export class PhysicalStringSimulation extends HTMLElement {
             'click-area'
         ) as HTMLButtonElement;
 
+        const collisionCheck = (xPos: number, yPos: number) => {
+            if (this.meshInfo !== null) {
+                const { masses } = this.meshInfo;
+                let dist = Number.MAX_SAFE_INTEGER;
+
+                for (const mass of masses) {
+                    const d = distance(mass.position, this.massPosition);
+                    if (d < dist) {
+                        dist = d;
+                    }
+                }
+
+                if (dist < 0.01) {
+                    injectForce(xPos, yPos);
+                }
+            }
+        };
+
         const initialize = async () => {
             if (this.initialized) {
                 return;
@@ -189,6 +221,8 @@ export class PhysicalStringSimulation extends HTMLElement {
 
             this.node.port.onmessage = (event: MessageEvent<MeshInfo>) => {
                 const { masses, springs, struck } = event.data;
+
+                this.meshInfo = event.data;
 
                 this.mostRecentlyStruck = struck;
 
@@ -231,9 +265,12 @@ export class PhysicalStringSimulation extends HTMLElement {
 
                         ${elements}
                         ${lines}
+                        <circle id="mass" cx="${this.massPosition[1]}" cy="${this.massPosition[0]}" r="0.008" />
                     </svg>
                 `;
             };
+
+            collisionCheck(this.massPosition[0], this.massPosition[1]);
 
             this.initialized = true;
         };
@@ -357,6 +394,38 @@ export class PhysicalStringSimulation extends HTMLElement {
             const yPos = (event.pageX - rect.left) / rect.width;
             const xPos = (event.pageY - rect.top) / rect.height;
             injectForce(xPos, yPos);
+        });
+
+        clickArea.addEventListener('mousemove', async (event: MouseEvent) => {
+            // await initialize();
+            const rect = clickArea.getBoundingClientRect();
+            const yPos = (event.pageX - rect.left) / rect.width;
+            const xPos = (event.pageY - rect.top) / rect.height;
+
+            this.massPosition[0] = xPos;
+            this.massPosition[1] = yPos;
+
+            collisionCheck(xPos, yPos);
+
+            // if (this.meshInfo !== null) {
+            //     const { masses } = this.meshInfo;
+            //     let dist = Number.MAX_SAFE_INTEGER;
+
+            //     for (const mass of masses) {
+            //         const d = distance(mass.position, this.massPosition);
+            //         if (d < dist) {
+            //             dist = d;
+            //         }
+            //     }
+
+            //     if (dist < 0.003) {
+            //         injectForce(xPos, yPos);
+            //     }
+            // }
+
+            // const mass = this.shadowRoot.getElementById('mass');
+            // mass.setAttribute('cx', xPos.toString());
+            // mass.setAttribute('cy', yPos.toString());
         });
 
         const useAcc = () => {

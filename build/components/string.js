@@ -10,12 +10,23 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 const pointsEqual = (p1, p2) => {
     return p1[0] == p2[0] && p1[1] == p2[1];
 };
+const distance = (a, b) => {
+    let distance = 0;
+    for (let i = 0; i < a.length; i++) {
+        distance += Math.pow((a[i] - b[i]), 2);
+    }
+    return Math.sqrt(distance);
+};
 export class PhysicalStringSimulation extends HTMLElement {
     constructor() {
         super();
         this.initialized = false;
         this.node = null;
         this.isUsingAccelerometer = false;
+        this.massPosition = new Float32Array(2);
+        this.mass = 1;
+        this.meshInfo = null;
+        this.massPosition = new Float32Array([0, 0]);
     }
     render() {
         let shadow = this.shadowRoot;
@@ -125,6 +136,21 @@ export class PhysicalStringSimulation extends HTMLElement {
         </div>
         `;
         const clickArea = shadow.getElementById('click-area');
+        const collisionCheck = (xPos, yPos) => {
+            if (this.meshInfo !== null) {
+                const { masses } = this.meshInfo;
+                let dist = Number.MAX_SAFE_INTEGER;
+                for (const mass of masses) {
+                    const d = distance(mass.position, this.massPosition);
+                    if (d < dist) {
+                        dist = d;
+                    }
+                }
+                if (dist < 0.01) {
+                    injectForce(xPos, yPos);
+                }
+            }
+        };
         const initialize = () => __awaiter(this, void 0, void 0, function* () {
             if (this.initialized) {
                 return;
@@ -146,6 +172,7 @@ export class PhysicalStringSimulation extends HTMLElement {
             physicalStringSim.connect(context.destination);
             this.node.port.onmessage = (event) => {
                 const { masses, springs, struck } = event.data;
+                this.meshInfo = event.data;
                 this.mostRecentlyStruck = struck;
                 const elements = masses.map((m) => `<circle 
                             cx="${m.position[1]}" 
@@ -178,9 +205,11 @@ export class PhysicalStringSimulation extends HTMLElement {
 
                         ${elements}
                         ${lines}
+                        <circle id="mass" cx="${this.massPosition[1]}" cy="${this.massPosition[0]}" r="0.008" />
                     </svg>
                 `;
             };
+            collisionCheck(this.massPosition[0], this.massPosition[1]);
             this.initialized = true;
         });
         const tensionSlider = shadow.getElementById('tension-slider');
@@ -283,6 +312,31 @@ export class PhysicalStringSimulation extends HTMLElement {
             const yPos = (event.pageX - rect.left) / rect.width;
             const xPos = (event.pageY - rect.top) / rect.height;
             injectForce(xPos, yPos);
+        }));
+        clickArea.addEventListener('mousemove', (event) => __awaiter(this, void 0, void 0, function* () {
+            // await initialize();
+            const rect = clickArea.getBoundingClientRect();
+            const yPos = (event.pageX - rect.left) / rect.width;
+            const xPos = (event.pageY - rect.top) / rect.height;
+            this.massPosition[0] = xPos;
+            this.massPosition[1] = yPos;
+            collisionCheck(xPos, yPos);
+            // if (this.meshInfo !== null) {
+            //     const { masses } = this.meshInfo;
+            //     let dist = Number.MAX_SAFE_INTEGER;
+            //     for (const mass of masses) {
+            //         const d = distance(mass.position, this.massPosition);
+            //         if (d < dist) {
+            //             dist = d;
+            //         }
+            //     }
+            //     if (dist < 0.003) {
+            //         injectForce(xPos, yPos);
+            //     }
+            // }
+            // const mass = this.shadowRoot.getElementById('mass');
+            // mass.setAttribute('cx', xPos.toString());
+            // mass.setAttribute('cy', yPos.toString());
         }));
         const useAcc = () => {
             if (DeviceMotionEvent) {
