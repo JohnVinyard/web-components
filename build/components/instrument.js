@@ -391,17 +391,14 @@ export class Instrument extends HTMLElement {
             left: 0;
         }
 
-        #video-container, 
-        #canvas-element, 
-        #video-element {
-            width: 800px;
-            height: 800px;
-        }
+        
 
         video {
             -webkit-transform: scaleX(-1);
             transform: scaleX(-1);
         }
+
+        
 </style>
 <div class="instrument-container">
         <div class="current-event-vector" title="Most recent control-plane input vector">
@@ -409,7 +406,7 @@ export class Instrument extends HTMLElement {
         </div>
         <div id="video-container">
             <video autoplay playsinline id="video-element"></video>
-            <canvas id="canvas-element" height="1000" width="1000"></canvas>
+            <canvas id="canvas-element" width="800" height="800"></canvas>
         </div>
         
 </div>

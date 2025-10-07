@@ -8,5 +8,6 @@ import { Instrument } from './instrument';
 import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, };
+import { ConvInstrument } from './convinstrument';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, ConvInstrument, };
 //# sourceMappingURL=index.js.map

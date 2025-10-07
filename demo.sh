@@ -4,4 +4,4 @@ google-chrome \
     --allow-file-access \
     --allow-cross-origin-auth-prompt \
     --new-window \
-    rnn-instrument.html
+    index.html

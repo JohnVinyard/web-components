@@ -8,6 +8,7 @@ import { Instrument } from './instrument';
 import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
+import { ConvInstrument } from './convinstrument';
 
 export {
     AudioView,
@@ -20,4 +21,5 @@ export {
     Sampler,
     SamplerTest,
     PhysicalStringSimulation,
+    ConvInstrument,
 };
