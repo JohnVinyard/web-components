@@ -136,7 +136,7 @@ export class PhysicalStringSimulation extends HTMLElement {
         </div>
         `;
         const clickArea = shadow.getElementById('click-area');
-        const collisionCheck = (xPos, yPos) => {
+        const collisionCheck = (xPos, yPos, frc = null) => {
             if (this.meshInfo !== null) {
                 const { masses } = this.meshInfo;
                 let dist = Number.MAX_SAFE_INTEGER;
@@ -146,8 +146,8 @@ export class PhysicalStringSimulation extends HTMLElement {
                         dist = d;
                     }
                 }
-                if (dist < 0.01) {
-                    injectForce(xPos, yPos);
+                if (dist < 0.02) {
+                    injectForce(xPos, yPos, 1, frc);
                 }
             }
         };
@@ -279,27 +279,31 @@ export class PhysicalStringSimulation extends HTMLElement {
                 }
             }
         });
-        const injectForce = (xPos, yPos, magnitude = 1) => {
+        const injectForce = (xPos, yPos, magnitude = 1, frce = null) => {
             var _a;
             const currentModel = modelTypeSelect
                 .value;
+            let f = currentModel === 'plate' ||
+                currentModel === 'random' ||
+                currentModel === 'multi-string'
+                ? new Float32Array([
+                    Math.random() * 0.5 * magnitude,
+                    Math.random() * 0.5 * magnitude,
+                ])
+                : new Float32Array([
+                    0.1 + Math.random() * 0.5 * magnitude,
+                    0 * magnitude,
+                ]);
+            if (frce) {
+                f = frce;
+            }
             const force = {
                 location: currentModel === 'plate' ||
                     currentModel === 'random' ||
                     currentModel === 'multi-string'
                     ? new Float32Array([xPos, yPos])
                     : new Float32Array([0, yPos]),
-                force: currentModel === 'plate' ||
-                    currentModel === 'random' ||
-                    currentModel === 'multi-string'
-                    ? new Float32Array([
-                        Math.random() * 0.5 * magnitude,
-                        Math.random() * 0.5 * magnitude,
-                    ])
-                    : new Float32Array([
-                        0.1 + Math.random() * 0.5 * magnitude,
-                        0 * magnitude,
-                    ]),
+                force: f,
                 type: 'force-injection',
             };
             if ((_a = this.node) === null || _a === void 0 ? void 0 : _a.port) {
@@ -320,7 +324,15 @@ export class PhysicalStringSimulation extends HTMLElement {
             const xPos = (event.pageY - rect.top) / rect.height;
             this.massPosition[0] = xPos;
             this.massPosition[1] = yPos;
-            collisionCheck(xPos, yPos);
+            // TODO: This a quick/cheap proxy for calculating force, which
+            // _should_ be based on acceleration
+            const xDelta = (event.movementX - rect.left) / rect.width;
+            const yDelta = (event.movementY - rect.top) / rect.height;
+            const force = new Float32Array([
+                yDelta * this.mass,
+                xDelta * this.mass,
+            ]);
+            collisionCheck(xPos, yPos, force);
             // if (this.meshInfo !== null) {
             //     const { masses } = this.meshInfo;
             //     let dist = Number.MAX_SAFE_INTEGER;
