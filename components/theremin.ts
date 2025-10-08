@@ -346,7 +346,7 @@ export class ThereminInstrument extends HTMLElement {
 
         const context = new AudioContext({ sampleRate: 22050 });
         const osc = context.createOscillator();
-        osc.type = 'triangle';
+        osc.type = 'sine';
 
         const gain = context.createGain();
 
