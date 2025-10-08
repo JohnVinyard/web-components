@@ -1,63 +1,5 @@
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 
-// const elementwiseDifference = (
-//     a: Float32Array,
-//     b: Float32Array,
-//     out: Float32Array
-// ): Float32Array => {
-//     for (let i = 0; i < a.length; i++) {
-//         out[i] = a[i] - b[i];
-//     }
-//     return out;
-// };
-
-const twoDimArray = (
-    data: Float32Array,
-    shape: [number, number]
-): Float32Array[] => {
-    const [x, y] = shape;
-
-    const output: Float32Array[] = [];
-    for (let i = 0; i < data.length; i += y) {
-        output.push(data.slice(i, i + y));
-    }
-    return output;
-};
-
-const zeros = (size: number): Float32Array => {
-    return new Float32Array(size).fill(0);
-};
-
-// const zerosMatrix = (shape: [number, number]): Float32Array[] => {
-//     const total = shape[0] * shape[1];
-//     const z = zeros(total);
-//     return twoDimArray(z, shape);
-// };
-
-const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
-    return a.reduce((accum, current, index) => {
-        return accum + current * b[index];
-    }, 0);
-};
-
-// const sum = (a: Float32Array): number => {
-//     return a.reduce((accum, current) => {
-//         return accum + current;
-//     }, 0);
-// };
-
-// const l2Norm = (vec: Float32Array): number => {
-//     let norm = 0;
-//     for (let i = 0; i < vec.length; i++) {
-//         norm += vec[i] ** 2;
-//     }
-//     return Math.sqrt(norm);
-// };
-
-// const zerosLike = (x: Float32Array): Float32Array => {
-//     return new Float32Array(x.length).fill(0);
-// };
-
 interface Point {
     x: number;
     y: number;
@@ -99,8 +41,6 @@ const enableCam = async (shadowRoot: ShadowRoot): Promise<void> => {
 };
 
 let lastVideoTime: number = 0;
-
-// let lastPosition = new Float32Array(21 * 3);
 
 const colorScheme = [
     // Coral / Pink Tones
@@ -145,8 +85,6 @@ const predictWebcamLoop = (
     canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     newParams: (frequency: number, amplitude: number) => void
-    // deltaThreshold: number,
-    // inputTrigger: (vec: Float32Array) => void
 ): (() => void) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
@@ -154,8 +92,6 @@ const predictWebcamLoop = (
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // const output = zerosLike(lastPosition);
 
         let startTimeMs = performance.now();
         if (lastVideoTime !== video.currentTime) {
@@ -226,37 +162,7 @@ export const sin2d = (arr: Float32Array[]): Float32Array[] => {
     return arr.map(sin);
 };
 
-/**
- * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
- * with a new vector of length 128
- */
-// const dotProduct = (
-//     vector: Float32Array,
-//     matrix: Float32Array[]
-// ): Float32Array => {
-//     return new Float32Array(matrix.map((v) => vectorVectorDot(v, vector)));
-// };
-
-// const argMax = (vector: Float32Array): number => {
-//     let index = 0;
-//     let mx = Number.MIN_VALUE;
-//     for (let i = 0; i < vector.length; i++) {
-//         if (vector[i] > mx) {
-//             mx = vector[i];
-//             index = i;
-//         }
-//     }
-//     return index;
-// };
-
-// const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-//     var binaryString = atob(base64);
-//     var bytes = new Uint8Array(binaryString.length);
-//     for (var i = 0; i < binaryString.length; i++) {
-//         bytes[i] = binaryString.charCodeAt(i);
-//     }
-//     return bytes.buffer;
-// };
+export const midiToHz = (n: number) => 440 * 2 ** ((n - 69) / 12);
 
 class Interval {
     constructor(public readonly start: number, public readonly end: number) {
@@ -316,12 +222,12 @@ class IntervalMapping<T> {
 }
 
 const loudnessMapping = new IntervalMapping<LoudnessUnits>({
-    raw: new Interval(0.0001, 2),
+    raw: new Interval(0.0001, 1.1),
     relativePosition: new Interval(0, 1),
 });
 
 const frequencyMapping = new IntervalMapping<FrequencyUnits>({
-    hz: new Interval(150, 1000),
+    hz: new Interval(220, 1320),
     relativePosition: new Interval(0, 1),
 });
 
@@ -439,8 +345,7 @@ export class ThereminInstrument extends HTMLElement {
                     const freq = frequencyMapping.map(
                         rawFrequency,
                         'relativePosition',
-                        'hz',
-                        (x) => x ** 2
+                        'hz'
                     );
                     const amp = loudnessMapping.map(
                         rawAmplitude,
@@ -449,18 +354,16 @@ export class ThereminInstrument extends HTMLElement {
                         (x) => x ** 2
                     );
                     if (this.oscillator) {
-                        console.log('Setting freq to ', freq);
                         this.oscillator.frequency.exponentialRampToValueAtTime(
                             freq,
-                            this.context.currentTime + 0.1
+                            this.context.currentTime + 0.05
                         );
                     }
 
                     if (this.gain) {
-                        console.log('seting gain to', amp);
                         this.gain.gain.exponentialRampToValueAtTime(
                             amp,
-                            this.context.currentTime + 0.1
+                            this.context.currentTime + 0.05
                         );
                     }
                 }

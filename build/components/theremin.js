@@ -8,37 +8,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
-// const elementwiseDifference = (
-//     a: Float32Array,
-//     b: Float32Array,
-//     out: Float32Array
-// ): Float32Array => {
-//     for (let i = 0; i < a.length; i++) {
-//         out[i] = a[i] - b[i];
-//     }
-//     return out;
-// };
-const twoDimArray = (data, shape) => {
-    const [x, y] = shape;
-    const output = [];
-    for (let i = 0; i < data.length; i += y) {
-        output.push(data.slice(i, i + y));
-    }
-    return output;
-};
-const zeros = (size) => {
-    return new Float32Array(size).fill(0);
-};
-// const zerosMatrix = (shape: [number, number]): Float32Array[] => {
-//     const total = shape[0] * shape[1];
-//     const z = zeros(total);
-//     return twoDimArray(z, shape);
-// };
-const vectorVectorDot = (a, b) => {
-    return a.reduce((accum, current, index) => {
-        return accum + current * b[index];
-    }, 0);
-};
 const meanPoint = (points) => {
     const nItems = points.length;
     const output = { x: 0, y: 0 };
@@ -68,7 +37,6 @@ const enableCam = (shadowRoot) => __awaiter(void 0, void 0, void 0, function* ()
     video.srcObject = stream;
 });
 let lastVideoTime = 0;
-// let lastPosition = new Float32Array(21 * 3);
 const colorScheme = [
     // Coral / Pink Tones
     'rgb(255, 99, 130)',
@@ -99,16 +67,12 @@ const colorScheme = [
     // Accent
     'rgb(255, 255, 255)', // White (highlight or background contrast)
 ];
-const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, newParams
-// deltaThreshold: number,
-// inputTrigger: (vec: Float32Array) => void
-) => {
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, newParams) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // const output = zerosLike(lastPosition);
         let startTimeMs = performance.now();
         if (lastVideoTime !== video.currentTime) {
             const detections = handLandmarker.detectForVideo(video, startTimeMs);
@@ -158,35 +122,7 @@ export const sin = (arr) => {
 export const sin2d = (arr) => {
     return arr.map(sin);
 };
-/**
- * e.g., if vetor is length 64, and matrix is (128, 64), we'll end up
- * with a new vector of length 128
- */
-// const dotProduct = (
-//     vector: Float32Array,
-//     matrix: Float32Array[]
-// ): Float32Array => {
-//     return new Float32Array(matrix.map((v) => vectorVectorDot(v, vector)));
-// };
-// const argMax = (vector: Float32Array): number => {
-//     let index = 0;
-//     let mx = Number.MIN_VALUE;
-//     for (let i = 0; i < vector.length; i++) {
-//         if (vector[i] > mx) {
-//             mx = vector[i];
-//             index = i;
-//         }
-//     }
-//     return index;
-// };
-// const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-//     var binaryString = atob(base64);
-//     var bytes = new Uint8Array(binaryString.length);
-//     for (var i = 0; i < binaryString.length; i++) {
-//         bytes[i] = binaryString.charCodeAt(i);
-//     }
-//     return bytes.buffer;
-// };
+export const midiToHz = (n) => 440 * Math.pow(2, ((n - 69) / 12));
 class Interval {
     constructor(start, end) {
         this.start = start;
@@ -222,11 +158,11 @@ class IntervalMapping {
     }
 }
 const loudnessMapping = new IntervalMapping({
-    raw: new Interval(0.0001, 2),
+    raw: new Interval(0.0001, 1.1),
     relativePosition: new Interval(0, 1),
 });
 const frequencyMapping = new IntervalMapping({
-    hz: new Interval(150, 1000),
+    hz: new Interval(220, 1320),
     relativePosition: new Interval(0, 1),
 });
 export class ThereminInstrument extends HTMLElement {
@@ -247,7 +183,7 @@ export class ThereminInstrument extends HTMLElement {
             }
             const context = new AudioContext({ sampleRate: 22050 });
             const osc = context.createOscillator();
-            osc.type = 'triangle';
+            osc.type = 'sine';
             const gain = context.createGain();
             const conv = context.createConvolver();
             conv.normalize = true;
@@ -318,15 +254,13 @@ export class ThereminInstrument extends HTMLElement {
             const ctx = canvas.getContext('2d');
             enableCam(shadow);
             const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, (rawFrequency, rawAmplitude) => {
-                const freq = frequencyMapping.map(rawFrequency, 'relativePosition', 'hz', (x) => Math.pow(x, 2));
+                const freq = frequencyMapping.map(rawFrequency, 'relativePosition', 'hz');
                 const amp = loudnessMapping.map(rawAmplitude, 'relativePosition', 'raw', (x) => Math.pow(x, 2));
                 if (this.oscillator) {
-                    console.log('Setting freq to ', freq);
-                    this.oscillator.frequency.exponentialRampToValueAtTime(freq, this.context.currentTime + 0.1);
+                    this.oscillator.frequency.exponentialRampToValueAtTime(freq, this.context.currentTime + 0.05);
                 }
                 if (this.gain) {
-                    console.log('seting gain to', amp);
-                    this.gain.gain.exponentialRampToValueAtTime(amp, this.context.currentTime + 0.1);
+                    this.gain.gain.exponentialRampToValueAtTime(amp, this.context.currentTime + 0.05);
                 }
             });
             const video = shadow.querySelector('video');
