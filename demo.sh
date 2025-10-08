@@ -4,4 +4,4 @@ google-chrome \
     --allow-file-access \
     --allow-cross-origin-auth-prompt \
     --new-window \
-    string.html
+    index.html

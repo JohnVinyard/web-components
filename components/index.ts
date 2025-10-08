@@ -9,6 +9,7 @@ import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
 import { ConvInstrument } from './convinstrument';
+import { ThereminInstrument } from './theremin';
 
 export {
     AudioView,
@@ -22,4 +23,5 @@ export {
     SamplerTest,
     PhysicalStringSimulation,
     ConvInstrument,
+    ThereminInstrument,
 };

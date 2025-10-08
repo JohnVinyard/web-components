@@ -9,5 +9,6 @@ import { Sampler } from './synth';
 import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
 import { ConvInstrument } from './convinstrument';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, ConvInstrument, };
+import { ThereminInstrument } from './theremin';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, ConvInstrument, ThereminInstrument, };
 //# sourceMappingURL=index.js.map
