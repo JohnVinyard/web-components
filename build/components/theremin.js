@@ -10,10 +10,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 const meanPoint = (points) => {
     const nItems = points.length;
-    const output = { x: 0, y: 0 };
+    const output = { x: 0, y: 0, z: 0 };
     for (const point of points) {
         output.x += point.x / nItems;
         output.y += point.y / nItems;
+        output.z = point.z / nItems;
     }
     return output;
 };
@@ -37,36 +38,43 @@ const enableCam = (shadowRoot) => __awaiter(void 0, void 0, void 0, function* ()
     video.srcObject = stream;
 });
 let lastVideoTime = 0;
-const colorScheme = [
-    // Coral / Pink Tones
-    'rgb(255, 99, 130)',
-    'rgb(255, 143, 160)',
-    'rgb(255, 181, 194)',
-    // Warm Yellows / Oranges
-    'rgb(255, 207, 64)',
-    'rgb(255, 179, 71)',
-    'rgb(255, 222, 130)',
-    // Greens
-    'rgb(72, 207, 173)',
-    'rgb(112, 219, 182)',
-    'rgb(186, 242, 203)',
-    // Blues
-    'rgb(64, 153, 255)',
-    'rgb(108, 189, 255)',
-    'rgb(179, 220, 255)',
-    // Purples
-    'rgb(149, 117, 205)',
-    'rgb(178, 145, 220)',
-    'rgb(210, 190, 245)',
-    // Neutrals
-    'rgb(240, 240, 240)',
-    'rgb(200, 200, 200)',
-    'rgb(160, 160, 160)',
-    'rgb(100, 100, 100)',
-    'rgb(33, 33, 33)',
-    // Accent
-    'rgb(255, 255, 255)', // White (highlight or background contrast)
-];
+const colors = {
+    purple: '#DF00FE',
+    yellow: '#FFF857',
+    green: '#3EFF15',
+};
+const colorValues = Object.values(colors);
+const nColors = colorValues.length;
+// const colorScheme = [
+//     // Coral / Pink Tones
+//     'rgb(255, 99, 130)', // Coral Pink
+//     'rgb(255, 143, 160)', // Blush
+//     'rgb(255, 181, 194)', // Light Rose
+//     // Warm Yellows / Oranges
+//     'rgb(255, 207, 64)', // Honey Yellow
+//     'rgb(255, 179, 71)', // Soft Orange
+//     'rgb(255, 222, 130)', // Pale Gold
+//     // Greens
+//     'rgb(72, 207, 173)', // Mint Green
+//     'rgb(112, 219, 182)', // Soft Seafoam
+//     'rgb(186, 242, 203)', // Pastel Green
+//     // Blues
+//     'rgb(64, 153, 255)', // Sky Blue
+//     'rgb(108, 189, 255)', // Light Blue
+//     'rgb(179, 220, 255)', // Pale Azure
+//     // Purples
+//     'rgb(149, 117, 205)', // Lavender Purple
+//     'rgb(178, 145, 220)', // Soft Lilac
+//     'rgb(210, 190, 245)', // Pale Violet
+//     // Neutrals
+//     'rgb(240, 240, 240)', // Light Gray
+//     'rgb(200, 200, 200)', // Medium Gray
+//     'rgb(160, 160, 160)', // Soft Charcoal
+//     'rgb(100, 100, 100)', // Dark Gray
+//     'rgb(33, 33, 33)', // Deep Charcoal
+//     // Accent
+//     'rgb(255, 255, 255)', // White (highlight or background contrast)
+// ];
 const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, newParams) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
@@ -89,13 +97,68 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, newParams) =
                     // const pt: Point = { x: 0, y: 0};
                     for (let j = 0; j < landmarks.length; j++) {
                         const landmark = landmarks[j];
-                        points.push({ x: landmark.x, y: landmark.y });
+                        points.push({
+                            x: landmark.x,
+                            y: landmark.y,
+                            z: landmark.z,
+                        });
                         const x = landmark.x * canvas.width;
                         const y = landmark.y * canvas.height;
+                        /*
+Name: X11 Purple
+Hex: #A117F2
+RGB: (161, 23, 242)
+CMYK: (34, 91, 0, 5)
+HSV: 278° 90% 95%
+HSL: 278° 89% 52%
+RAL: 4005
+Pantone: 2592 C
+
+Name: Electric Purple
+Hex: #BE00FE
+RGB: (190, 0, 254)
+CMYK: (25, 100, 0, 0)
+HSV: 285° 100% 100%
+HSL: 285° 100% 50%
+RAL: 4010
+Pantone: Purple C
+
+Name: Phlox
+Hex: #DF00FE
+RGB: (223, 0, 254)
+CMYK: (12, 100, 0, 0)
+HSV: 293° 100% 100%
+HSL: 293° 100% 50%
+RAL: 4003
+Pantone: 807 C
+
+Name: Dodie Yellow
+Hex: #FFF857
+RGB: (255, 248, 87)
+CMYK: (0, 3, 66, 0)
+HSV: 58° 66% 100%
+HSL: 58° 100% 67%
+RAL: 1016
+Pantone: 100 C
+
+Name: Neon Green
+Hex: #3EFF15
+RGB: (62, 255, 21)
+CMYK: (76, 0, 92, 0)
+HSV: 109° 92% 100%
+HSL: 109° 100% 54%
+RAL: 6038
+Pantone: 802 C
+                        */
                         ctx.beginPath();
-                        ctx.arc(x, y, 3.5, 0, 2 * Math.PI);
-                        ctx.fillStyle = colorScheme[j];
+                        ctx.arc(x, y, 4.5, 0, 2 * Math.PI);
+                        ctx.fillStyle = colors['green'];
                         ctx.fill();
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(canvas.width / 2, 0);
+                        ctx.strokeStyle = colors['green'];
+                        ctx.stroke();
                     }
                 }
             }
@@ -158,7 +221,7 @@ class IntervalMapping {
     }
 }
 const loudnessMapping = new IntervalMapping({
-    raw: new Interval(0.0001, 1.1),
+    raw: new Interval(0.0001, 0.9),
     relativePosition: new Interval(0, 1),
 });
 const frequencyMapping = new IntervalMapping({
@@ -210,10 +273,16 @@ export class ThereminInstrument extends HTMLElement {
         }
         shadow.innerHTML = `
 <style>
+        .instrument-container, #start {
+            font-family: 'UnifrakturCook', cursive;
+            font-weight: 700;
+            font-style: normal;
+        }
 
         #video-container {
             position: relative;
         }
+
 
         #canvas-element, 
         #video-element {
@@ -222,10 +291,35 @@ export class ThereminInstrument extends HTMLElement {
             left: 0;
         }
 
+        #video-element {
+            filter: contrast(150%) sepia(0.25) hue-rotate(90deg);
+            border-radius: 5px;
+            opacity: 0.7;
+        }
+
+
         #start {
             position: absolute;
             top: 600px;
             left: 20px;
+            font-size: 2em;
+            width: 200px;
+            height: 75px;
+            color: #F9F6EE;
+            border-radius: 5px;
+            transform: translate(200px);
+            background: #878f91;
+            background: linear-gradient(180deg,rgba(135, 143, 145, 1) 0%, rgba(100, 100, 100, 1) 100%);
+            cursor-pointer;
+
+        }
+
+        #canvas-element {
+            filter: blur(3px);
+        }
+
+        #start:disabled {
+            opacity: 0.1;
         }
 
         video {
@@ -242,11 +336,13 @@ export class ThereminInstrument extends HTMLElement {
         </div>
         
 </div>
-<button id="start">Start</button>
+<button id="start">Enable Audio</button>
 `;
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.prepareAudioGraph();
+            startButton.setAttribute('disabled', 'true');
+            startButton.innerText = 'Audio Enabled';
         });
         const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
             const landmarker = yield createHandLandmarker();
@@ -257,10 +353,10 @@ export class ThereminInstrument extends HTMLElement {
                 const freq = frequencyMapping.map(rawFrequency, 'relativePosition', 'hz');
                 const amp = loudnessMapping.map(rawAmplitude, 'relativePosition', 'raw', (x) => Math.pow(x, 2));
                 if (this.oscillator) {
-                    this.oscillator.frequency.exponentialRampToValueAtTime(freq, this.context.currentTime + 0.05);
+                    this.oscillator.frequency.linearRampToValueAtTime(freq, this.context.currentTime + 0.08);
                 }
                 if (this.gain) {
-                    this.gain.gain.exponentialRampToValueAtTime(amp, this.context.currentTime + 0.05);
+                    this.gain.gain.linearRampToValueAtTime(amp, this.context.currentTime + 0.08);
                 }
             });
             const video = shadow.querySelector('video');

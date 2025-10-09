@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&display=swap"
+            rel="stylesheet"
+        />
+        <title>Web Audio Theremin</title>
+        <script src="build/components/bundle.js"></script>
+        <style>
+            body {
+                font-family: 'UnifrakturCook', cursive;
+                font-weight: 700;
+                font-style: normal;
+                background-color: #0b0b0f;
+                color: #f9f6ee;
+                height: 100vh;
+                background: #0b0b0f;
+                background: linear-gradient(
+                    180deg,
+                    rgba(11, 11, 15, 1) 0%,
+                    rgba(5, 0, 25, 1) 100%
+                );
+            }
+
+            hr {
+                display: block;
+            }
+
+            h1 {
+                text-decoration: underline;
+                font-size: 4em;
+            }
+
+            #container {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                align-content: center;
+                margin-right: 25vw;
+                margin-left: 25vw;
+            }
+
+            #theremin-container {
+                position: relative;
+                transform: translate(-300px);
+            }
+
+            /*
+            color_scheme = [
+    ("Neon Pumpkin", "#FF6B00"),
+    ("Void Black", "#0B0B0F"),
+    ("Plasma Green", "#39FF14"),
+    ("Ultraviolet Mist", "#8F00FF"),
+    ("Cyber Web", "#00D9FF"),
+    ("Specter Gray", "#5F6973")
+]
+            */
+        </style>
+    </head>
+
+    <body>
+        <div id="container">
+            <h1>Web Audio Theremin</h1>
+
+            <div id="theremin-container">
+                <theremin-instrument></theremin-instrument>
+            </div>
+        </div>
+    </body>
+</html>
