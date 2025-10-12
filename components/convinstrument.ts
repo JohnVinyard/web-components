@@ -265,28 +265,20 @@ class Instrument {
             g.gain.value = 0.0001;
             whiteNoise.connect(g);
 
-            // const r = this.router[i];
+            const resIndex = Math.floor(Math.random() * this.totalResonances);
+            const res = this.resonances[resIndex];
 
-            // for (let j = 0; j < this.nResonances; j++) {
-            //     const z: GainNode = this.context.createGain();
-            //     z.gain.value = r[j];
-            //     g.connect(z);
+            const c = this.context.createConvolver();
+            const buffer = this.context.createBuffer(1, this.nSamples, 22050);
+            buffer.getChannelData(0).set(res);
+            c.buffer = buffer;
+            
+            g.connect(c);
 
-            //     const startIndex: number = j * this.expressivity;
-            //     const stopIndex = startIndex + this.expressivity;
-
-            //     for (let k = startIndex; k < stopIndex; k += 1) {
-            //         z.connect(resonances[k]);
-            //     }
-            // }
-            g.connect(this.context.destination);
+            c.connect(this.context.destination);
 
             gains.push(g);
         }
-
-        // for (const mixer of this.mixers) {
-        //     mixer.connectTo(this.context.destination);
-        // }
 
         // for (let i = 0; i < this.nResonances; i++) {
         //     tanhGain.connect(this.context.destination, i);
@@ -410,7 +402,7 @@ export class ConvInstrument extends HTMLElement {
 
         const cp = uniform(
             0.001,
-            2,
+            1.5,
             new Float32Array(this.instrument.controlPlaneDim)
         );
         this.instrument.trigger(cp);
