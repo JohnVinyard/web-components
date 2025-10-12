@@ -20,6 +20,9 @@ class Tanh extends AudioWorkletProcessor {
         for (let i = 0; i < inputs.length; i++) {
             const inp = inputs[i][0];
             const out = outputs[i][0];
+            if (inp === undefined) {
+                continue;
+            }
             for (let j = 0; j < inp.length; j++) {
                 // apply gain and non-linearity
                 out[j] = Math.tanh(inp[j] * this.gains[i]);

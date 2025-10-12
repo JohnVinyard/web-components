@@ -30,10 +30,13 @@ class Tanh extends AudioWorkletProcessor {
         outputs: Float32Array[][],
         parameters: Record<string, Float32Array>
     ): boolean {
-        
         for (let i = 0; i < inputs.length; i++) {
             const inp = inputs[i][0];
             const out = outputs[i][0];
+
+            if (inp === undefined) {
+                continue;
+            }
 
             for (let j = 0; j < inp.length; j++) {
                 // apply gain and non-linearity

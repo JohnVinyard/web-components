@@ -220,17 +220,17 @@ class Instrument {
         const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
 
         // TODO: This should probably have n inputs for total resonances
-        // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-        //     processorOptions: {
-        //         gains: this.gains,
-        //     },
-        //     numberOfInputs: this.nResonances,
-        //     numberOfOutputs: this.nResonances,
-        //     outputChannelCount: Array(this.nResonances).fill(1),
-        //     channelCount: 1,
-        //     channelCountMode: 'explicit',
-        //     channelInterpretation: 'discrete',
-        // });
+        const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+            processorOptions: {
+                gains: this.gains,
+            },
+            numberOfInputs: this.nResonances,
+            numberOfOutputs: this.nResonances,
+            outputChannelCount: Array(this.nResonances).fill(1),
+            channelCount: 1,
+            channelCountMode: 'explicit',
+            channelInterpretation: 'discrete',
+        });
 
         // Build the last leg;  resonances, each group of which is connected
         // to an outgoing mixer
@@ -256,8 +256,8 @@ class Instrument {
                 m.acceptConnection(c, j);
             }
 
-            // const currentChannel = i / this.expressivity;
-            // m.connectTo(tanhGain, currentChannel);
+            const currentChannel = i / this.expressivity;
+            m.connectTo(tanhGain, currentChannel);
         }
 
         this.mixers = mixers;
@@ -286,11 +286,11 @@ class Instrument {
             gains.push(g);
         }
 
-        for (const mixer of mixers) {
-            mixer.connectTo(this.context.destination);
-        }
+        // for (const mixer of mixers) {
+        //     mixer.connectTo(this.context.destination);
+        // }
 
-        // tanhGain.connect(this.context.destination);
+        tanhGain.connect(this.context.destination);
 
         this.controlPlane = gains;
     }
