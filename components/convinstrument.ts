@@ -1,3 +1,309 @@
+import { AccessibleTypeArray, fromNpy } from './numpy';
+
+const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+    var binaryString = atob(base64);
+    var bytes = new Uint8Array(binaryString.length);
+    for (var i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+};
+
+const deserialize = (raw: string): [AccessibleTypeArray, any] => {
+    return fromNpy(base64ToArrayBuffer(raw));
+};
+
+const toContainer = (raw: string): ArrayContainer => {
+    const [arr, shape] = deserialize(raw);
+    return {
+        array: arr as Float32Array,
+        shape,
+    };
+};
+
+interface RawConvInstrumentParams {
+    /**
+     * Scalar gain per resonance of shape (n_resonances,)
+     */
+    gains: string;
+
+    /**
+     * A matrix with shape
+     * control_plane_dim x n_resonances
+     */
+    router: string;
+
+    /**
+     * Materialized resonances.  Original shape is (n_resonances, expressivity, n_samples)
+     * but flattened into (n_resonances * expressivity, n_samples)
+     */
+    resonances: string;
+}
+
+interface ArrayContainer {
+    array: Float32Array;
+    shape: any;
+}
+
+interface ConvInstrumentParams {
+    /**
+     * Scalar gain per resonance
+     */
+    gains: ArrayContainer;
+
+    /**
+     * A matrix with shape
+     * control_plane_dim x n_resonances
+     */
+    router: ArrayContainer;
+
+    /**
+     * Materialized resonances.  Original shape is (n_resonances, expressivity, n_samples)
+     * but flattened into (n_resonances * expressivity, n_samples)
+     */
+    resonances: ArrayContainer;
+}
+
+const fetchWeights = async (url: string): Promise<ConvInstrumentParams> => {
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    const { gains, router, resonances } = data as RawConvInstrumentParams;
+    return {
+        gains: toContainer(gains),
+        router: toContainer(router),
+        resonances: toContainer(resonances),
+    };
+};
+
+class Mixer {
+    constructor(private readonly nodes: GainNode[]) {}
+
+    public static mixerWithNChannels(context: AudioContext, n: number): Mixer {
+        const nodes: GainNode[] = [];
+        for (let i = 0; i < n; i++) {
+            const g = context.createGain();
+            g.gain.value = 0.0001;
+            nodes.push(g);
+        }
+        return new Mixer(nodes);
+    }
+
+    public connectTo(node: AudioNode, channel?: number): void {
+        for (const gain of this.nodes) {
+            gain.connect(node, undefined, channel);
+        }
+    }
+
+    public acceptConnection(node: AudioNode, channel: number): void {
+        node.connect(this.nodes[channel]);
+    }
+
+    public randomGains() {
+        const vec = new Float32Array(this.nodes.length);
+        const random = uniform(-1, 1, vec);
+        this.adjust(random);
+    }
+
+    public sparseGains() {
+        const vec = new Float32Array(this.nodes.length);
+        const random = sparse(0.05, vec);
+        this.adjust(random);
+    }
+
+    public adjust(gainValues: Float32Array) {
+        const vec = new Float32Array(gainValues.length);
+        const sm = softmax(gainValues, vec);
+        console.log(`Setting gains ${sm}`);
+        for (let i = 0; i < this.nodes.length; i++) {
+            const node = this.nodes[i];
+            node.gain.value = sm[i];
+        }
+    }
+
+    public oneHot(index: number) {
+        for (let i = 0; i < this.nodes.length; i++) {
+            const node = this.nodes[i];
+            if (i === index) {
+                node.gain.value = 1;
+            } else {
+                node.gain.value = 0.0001;
+            }
+        }
+    }
+}
+
+const twoDimArray = (
+    data: Float32Array,
+    shape: [number, number]
+): Float32Array[] => {
+    const [x, y] = shape;
+
+    const output: Float32Array[] = [];
+    for (let i = 0; i < data.length; i += y) {
+        output.push(data.slice(i, i + y));
+    }
+    return output;
+};
+
+class Instrument {
+    private readonly gains: Float32Array;
+    private readonly router: Float32Array[];
+    private readonly resonances: Float32Array[];
+    private controlPlane: GainNode[];
+    private mixers: Mixer[];
+
+    constructor(
+        private readonly context: AudioContext,
+        private readonly params: ConvInstrumentParams,
+        public readonly expressivity: number
+    ) {
+        this.gains = params.gains.array;
+        this.router = twoDimArray(params.router.array, params.router.shape);
+        this.resonances = twoDimArray(
+            params.resonances.array,
+            params.resonances.shape
+        );
+    }
+
+    public static async fromURL(
+        url: string,
+        context: AudioContext,
+        expressivity: number
+    ): Promise<Instrument> {
+        const params: ConvInstrumentParams = await fetchWeights(url);
+        const instr = new Instrument(context, params, expressivity);
+        await instr.buildNetwork();
+        return instr;
+    }
+
+    public get nSamples(): number {
+        return this.resonances[0].length;
+    }
+
+    public get controlPlaneDim(): number {
+        return this.router.length;
+    }
+
+    public get nResonances(): number {
+        return this.resonances.length / this.expressivity;
+    }
+
+    public get totalResonances(): number {
+        return this.resonances.length;
+    }
+
+    public async buildNetwork() {
+        try {
+            await this.context.audioWorklet.addModule(
+                // '/build/components/rnn.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/tanh.js'
+            );
+        } catch (err) {
+            console.log(`Failed to add module due to ${err}`);
+            alert(`Failed to load module due to ${err}`);
+        }
+
+        try {
+            await this.context.audioWorklet.addModule(
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/whitenoise.js'
+            );
+        } catch (err) {
+            console.log(`Failed to add module due to ${err}`);
+            alert(`Failed to load module due to ${err}`);
+        }
+
+        const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
+
+        // TODO: This should probably have n inputs for total resonances
+        const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+            processorOptions: {
+                gains: this.gains,
+            },
+            numberOfInputs: this.nResonances,
+            numberOfOutputs: this.nResonances,
+        });
+
+        tanhGain.connect(this.context.destination);
+
+        // Build the last leg;  resonances, each group of which is connected
+        // to an outgoing mixer
+        const resonances: ConvolverNode[] = [];
+        const mixers: Mixer[] = [];
+
+        for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+            const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
+            m.oneHot(0);
+            mixers.push(m);
+
+            for (let j = 0; j < this.expressivity; j++) {
+                const c = this.context.createConvolver();
+                const buffer = this.context.createBuffer(
+                    1,
+                    this.nSamples,
+                    22050
+                );
+                buffer.getChannelData(0).set(this.resonances[i + j]);
+                resonances.push(c);
+                m.acceptConnection(c, j);
+            }
+
+            const currentChannel = i / this.expressivity;
+            m.connectTo(tanhGain, currentChannel);
+        }
+
+        this.mixers = mixers;
+
+        const gains: GainNode[] = [];
+        for (let i = 0; i < this.controlPlaneDim; i++) {
+            const g = this.context.createGain();
+            g.gain.value = 0.0001;
+            whiteNoise.connect(g);
+
+            const r = this.router[i];
+
+            for (let j = 0; j < this.nResonances; j++) {
+                const z: GainNode = this.context.createGain();
+                z.gain.value = r[j];
+                g.connect(z);
+
+                const startIndex: number = j * this.expressivity;
+                const stopIndex = startIndex + this.expressivity;
+
+                for (let k = startIndex; k < stopIndex; k += 1) {
+                    z.connect(resonances[k]);
+                }
+            }
+
+            gains.push(g);
+        }
+
+        this.controlPlane = gains;
+    }
+
+    public trigger(input: Float32Array) {
+        for (let i = 0; i < this.controlPlane.length; i++) {
+            const gain = this.controlPlane[i];
+
+            gain.gain.exponentialRampToValueAtTime(
+                input[i],
+                this.context.currentTime + 0.02
+            );
+            gain.gain.exponentialRampToValueAtTime(
+                0.0001,
+                this.context.currentTime + 0.5
+            );
+        }
+    }
+
+    public deform(mixes: Float32Array) {
+        for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+            const slice = mixes.slice(i, i + this.expressivity);
+            this.mixers[i].adjust(slice);
+        }
+    }
+}
+
 const exp = (vec: Float32Array, out: Float32Array): Float32Array => {
     for (let i = 0; i < vec.length; i++) {
         out[i] = Math.exp(vec[i]);
@@ -47,37 +353,10 @@ const sparse = (probability: number, out: Float32Array): Float32Array => {
     return out;
 };
 
-class Mixer {
-    constructor(private readonly nodes: GainNode[]) {}
-
-    public randomGains() {
-        const vec = new Float32Array(this.nodes.length);
-        const random = uniform(-1, 1, vec);
-        this.adjust(random);
-    }
-
-    public sparseGains() {
-        const vec = new Float32Array(this.nodes.length);
-        const random = sparse(0.05, vec);
-        this.adjust(random);
-    }
-
-    public adjust(gainValues: Float32Array) {
-        const vec = new Float32Array(gainValues.length);
-        const sm = softmax(gainValues, vec);
-        console.log(`Setting gains ${sm}`);
-        for (let i = 0; i < this.nodes.length; i++) {
-            const node = this.nodes[i];
-            node.gain.value = sm[i];
-        }
-    }
-}
-
 export class ConvInstrument extends HTMLElement {
-    private instrument: GainNode | null = null;
+    private instrument: Instrument | null = null;
     private context: AudioContext | null = null;
     private initialized: boolean = false;
-    private mixer: Mixer | null = null;
 
     constructor() {
         super();
@@ -100,17 +379,11 @@ export class ConvInstrument extends HTMLElement {
                 }
             </style>
             <div id="target"></div>
-            <button id="adjust">Random Mix</button>
         `;
 
         const target = shadow.getElementById('target');
         target.addEventListener('click', () => {
             this.trigger();
-        });
-
-        const button = shadow.getElementById('adjust');
-        button.addEventListener('click', () => {
-            this.mixer.sparseGains();
         });
     }
 
@@ -121,14 +394,11 @@ export class ConvInstrument extends HTMLElement {
             return;
         }
 
-        this.instrument.gain.exponentialRampToValueAtTime(
-            5.0,
-            this.context.currentTime + 0.02
+        const cp = sparse(
+            0.1,
+            new Float32Array(this.instrument.controlPlaneDim)
         );
-        this.instrument.gain.exponentialRampToValueAtTime(
-            0.0001,
-            this.context.currentTime + 0.5
-        );
+        this.instrument.trigger(cp);
     }
 
     private async initialize() {
@@ -136,94 +406,13 @@ export class ConvInstrument extends HTMLElement {
             return;
         }
 
-        const impulseResponses = [
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Five Columns Long.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Scala Milan Opera Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Direct Cabinet N3.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Small Drum Room.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Deep Space.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Masonic Lodge.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Large Wide Echo Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/St Nicolaes Church.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Right Glass Triangle.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Chateau de Logne, Outside.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Ruby Room.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Nice Drum Room.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Vocal Duo.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Conic Long Echo Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Cement Blocks 1.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Narrow Bumpy Space.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Musikvereinsaal.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Bottle Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Cement Blocks 2.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Direct Cabinet N2.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Highly Damped Large Room.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/In The Silo Revised.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/French 18th Century Salon.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Rays.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Greek 7 Echo Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Small Prehistoric Cave.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Large Long Echo Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Five Columns.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/On a Star.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Parking Garage.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Direct Cabinet N1.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Going Home.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Direct Cabinet N4.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Trig Room.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Block Inside.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Derlon Sanctuary.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/Large Bottle Hall.wav',
-            'https://matching-pursuit-reverbs.s3.amazonaws.com/In The Silo.wav',
-        ];
         const context = new AudioContext({
             sampleRate: 22050,
         });
 
         this.context = context;
 
-        const gain = context.createGain();
-
-        try {
-            await context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/whitenoise.js'
-            );
-        } catch (err) {
-            console.log(`Failed to add module due to ${err}`);
-            alert(`Failed to load module due to ${err}`);
-        }
-
-        const whiteNoise = new AudioWorkletNode(context, 'white-noise');
-        whiteNoise.connect(gain);
-        // gain.connect(context.destination);
-        this.instrument = gain;
-
-        const gainNodes: GainNode[] = [];
-
-        const convGain = 1 / impulseResponses.length;
-        for (const ir of impulseResponses) {
-            const conv = context.createConvolver();
-            conv.normalize = true;
-
-            conv.buffer = await fetch(ir)
-                .then((resp) => resp.arrayBuffer())
-                .then((x) => {
-                    const audio = context.decodeAudioData(x);
-                    return audio;
-                });
-            console.log(`Loaded ${ir}`);
-            const g = context.createGain();
-            gainNodes.push(g);
-            g.gain.value = convGain;
-            conv.connect(g);
-            g.connect(context.destination);
-            gain.connect(conv);
-        }
-
-        gain.gain.value = 0.0001;
-
-        this.mixer = new Mixer(gainNodes);
-        this.mixer.sparseGains();
+        this.instrument = await Instrument.fromURL('', context, 2);
 
         this.initialized = true;
     }
