@@ -219,6 +219,7 @@ class Instrument {
 
         const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
 
+        // TODO: This should probably have n inputs for total resonances
         // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
         //     processorOptions: {
         //         gains: this.gains,
@@ -233,31 +234,33 @@ class Instrument {
 
         // Build the last leg;  resonances, each group of which is connected
         // to an outgoing mixer
-        // const resonances: ConvolverNode[] = [];
-        // const mixers: Mixer[] = [];
+        const resonances: ConvolverNode[] = [];
+        const mixers: Mixer[] = [];
 
-        // for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-        //     const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
-        //     m.oneHot(0);
-        //     mixers.push(m);
+        for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+            const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
+            m.oneHot(0);
+            mixers.push(m);
 
-        //     for (let j = 0; j < this.expressivity; j++) {
-        //         const c = this.context.createConvolver();
-        //         const buffer = this.context.createBuffer(
-        //             1,
-        //             this.nSamples,
-        //             22050
-        //         );
-        //         buffer.getChannelData(0).set(this.resonances[i + j]);
-        //         resonances.push(c);
-        //         m.acceptConnection(c, j);
-        //     }
+            for (let j = 0; j < this.expressivity; j++) {
+                const c = this.context.createConvolver();
+                const buffer = this.context.createBuffer(
+                    1,
+                    this.nSamples,
+                    22050
+                );
+                buffer.getChannelData(0).set(this.resonances[i + j]);
+                c.buffer = buffer;
 
-        //     const currentChannel = i / this.expressivity;
-        //     // m.connectTo(tanhGain, currentChannel);
-        // }
+                resonances.push(c);
+                m.acceptConnection(c, j);
+            }
 
-        // this.mixers = mixers;
+            // const currentChannel = i / this.expressivity;
+            // m.connectTo(tanhGain, currentChannel);
+        }
+
+        this.mixers = mixers;
 
         const gains: GainNode[] = [];
         for (let i = 0; i < this.controlPlaneDim; i++) {
@@ -265,24 +268,29 @@ class Instrument {
             g.gain.value = 0.0001;
             whiteNoise.connect(g);
 
-            const resIndex = Math.floor(Math.random() * this.totalResonances);
-            const res = this.resonances[resIndex];
+            const r = this.router[i];
 
-            const c = this.context.createConvolver();
-            const buffer = this.context.createBuffer(1, this.nSamples, 22050);
-            buffer.getChannelData(0).set(res);
-            c.buffer = buffer;
-            
-            g.connect(c);
+            for (let j = 0; j < this.nResonances; j++) {
+                const z: GainNode = this.context.createGain();
+                z.gain.value = r[j];
+                g.connect(z);
 
-            c.connect(this.context.destination);
+                const startIndex: number = j * this.expressivity;
+                const stopIndex = startIndex + this.expressivity;
+
+                for (let k = startIndex; k < stopIndex; k += 1) {
+                    z.connect(resonances[k]);
+                }
+            }
 
             gains.push(g);
         }
 
-        // for (let i = 0; i < this.nResonances; i++) {
-        //     tanhGain.connect(this.context.destination, i);
-        // }
+        for (const mixer of mixers) {
+            mixer.connectTo(this.context.destination);
+        }
+
+        // tanhGain.connect(this.context.destination);
 
         this.controlPlane = gains;
     }
@@ -402,7 +410,7 @@ export class ConvInstrument extends HTMLElement {
 
         const cp = uniform(
             0.001,
-            1.5,
+            2,
             new Float32Array(this.instrument.controlPlaneDim)
         );
         this.instrument.trigger(cp);
