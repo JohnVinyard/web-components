@@ -29,11 +29,12 @@ const toContainer = (raw) => {
 const fetchWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
     const data = yield resp.json();
-    const { gains, router, resonances } = data;
+    const { gains, router, resonances, hand } = data;
     return {
         gains: toContainer(gains),
         router: toContainer(router),
         resonances: toContainer(resonances),
+        hand: toContainer(hand),
     };
 });
 class Mixer {
@@ -128,68 +129,79 @@ class Instrument {
     buildNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule(
-                // '/build/components/rnn.js'
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.78/build/components/whitenoise.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/whitenoise.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
             const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
-            // TODO: This should probably have n inputs for total resonances
-            const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-                processorOptions: {
-                    gains: this.gains,
-                },
-                numberOfInputs: this.nResonances,
-                numberOfOutputs: this.nResonances,
-            });
-            tanhGain.connect(this.context.destination);
+            // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+            //     processorOptions: {
+            //         gains: this.gains,
+            //     },
+            //     numberOfInputs: this.nResonances,
+            //     numberOfOutputs: this.nResonances,
+            //     outputChannelCount: Array(this.nResonances).fill(1),
+            //     channelCount: 1,
+            //     channelCountMode: 'explicit',
+            //     channelInterpretation: 'discrete',
+            // });
             // Build the last leg;  resonances, each group of which is connected
             // to an outgoing mixer
-            const resonances = [];
-            const mixers = [];
-            for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-                const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
-                m.oneHot(0);
-                mixers.push(m);
-                for (let j = 0; j < this.expressivity; j++) {
-                    const c = this.context.createConvolver();
-                    const buffer = this.context.createBuffer(1, this.nSamples, 22050);
-                    buffer.getChannelData(0).set(this.resonances[i + j]);
-                    resonances.push(c);
-                    m.acceptConnection(c, j);
-                }
-                const currentChannel = i / this.expressivity;
-                m.connectTo(tanhGain, currentChannel);
-            }
-            this.mixers = mixers;
+            // const resonances: ConvolverNode[] = [];
+            // const mixers: Mixer[] = [];
+            // for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+            //     const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
+            //     m.oneHot(0);
+            //     mixers.push(m);
+            //     for (let j = 0; j < this.expressivity; j++) {
+            //         const c = this.context.createConvolver();
+            //         const buffer = this.context.createBuffer(
+            //             1,
+            //             this.nSamples,
+            //             22050
+            //         );
+            //         buffer.getChannelData(0).set(this.resonances[i + j]);
+            //         resonances.push(c);
+            //         m.acceptConnection(c, j);
+            //     }
+            //     const currentChannel = i / this.expressivity;
+            //     // m.connectTo(tanhGain, currentChannel);
+            // }
+            // this.mixers = mixers;
             const gains = [];
             for (let i = 0; i < this.controlPlaneDim; i++) {
                 const g = this.context.createGain();
                 g.gain.value = 0.0001;
                 whiteNoise.connect(g);
-                const r = this.router[i];
-                for (let j = 0; j < this.nResonances; j++) {
-                    const z = this.context.createGain();
-                    z.gain.value = r[j];
-                    g.connect(z);
-                    const startIndex = j * this.expressivity;
-                    const stopIndex = startIndex + this.expressivity;
-                    for (let k = startIndex; k < stopIndex; k += 1) {
-                        z.connect(resonances[k]);
-                    }
-                }
+                // const r = this.router[i];
+                // for (let j = 0; j < this.nResonances; j++) {
+                //     const z: GainNode = this.context.createGain();
+                //     z.gain.value = r[j];
+                //     g.connect(z);
+                //     const startIndex: number = j * this.expressivity;
+                //     const stopIndex = startIndex + this.expressivity;
+                //     for (let k = startIndex; k < stopIndex; k += 1) {
+                //         z.connect(resonances[k]);
+                //     }
+                // }
+                g.connect(this.context.destination);
                 gains.push(g);
             }
+            // for (const mixer of this.mixers) {
+            //     mixer.connectTo(this.context.destination);
+            // }
+            // for (let i = 0; i < this.nResonances; i++) {
+            //     tanhGain.connect(this.context.destination, i);
+            // }
             this.controlPlane = gains;
         });
     }
@@ -280,7 +292,7 @@ export class ConvInstrument extends HTMLElement {
             if (this.instrument === null) {
                 return;
             }
-            const cp = sparse(0.1, new Float32Array(this.instrument.controlPlaneDim));
+            const cp = uniform(0.001, 2, new Float32Array(this.instrument.controlPlaneDim));
             this.instrument.trigger(cp);
         });
     }
@@ -293,7 +305,7 @@ export class ConvInstrument extends HTMLElement {
                 sampleRate: 22050,
             });
             this.context = context;
-            this.instrument = yield Instrument.fromURL('', context, 2);
+            this.instrument = yield Instrument.fromURL('https://resonancemodel.s3.amazonaws.com/resonancemodelparams_6cb84da73946adfec8173ba6d9935143705c0fdd', context, 2);
             this.initialized = true;
         });
     }

@@ -4,4 +4,4 @@ google-chrome \
     --allow-file-access \
     --allow-cross-origin-auth-prompt \
     --new-window \
-    theremin.html
+    index.html
