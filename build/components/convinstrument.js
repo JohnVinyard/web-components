@@ -8,6 +8,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { fromNpy } from './numpy';
+import { FilesetResolver, HandLandmarker } from '@mediapipe/tasks-vision';
 const base64ToArrayBuffer = (base64) => {
     var binaryString = atob(base64);
     var bytes = new Uint8Array(binaryString.length);
@@ -15,6 +16,9 @@ const base64ToArrayBuffer = (base64) => {
         bytes[i] = binaryString.charCodeAt(i);
     }
     return bytes.buffer;
+};
+const zeros = (size) => {
+    return new Float32Array(size).fill(0);
 };
 const deserialize = (raw) => {
     return fromNpy(base64ToArrayBuffer(raw));
@@ -25,6 +29,31 @@ const toContainer = (raw) => {
         array: arr,
         shape,
     };
+};
+const twoDimArray = (data, shape) => {
+    const [x, y] = shape;
+    const output = [];
+    for (let i = 0; i < data.length; i += y) {
+        output.push(data.slice(i, i + y));
+    }
+    return output;
+};
+const vectorVectorDot = (a, b) => {
+    return a.reduce((accum, current, index) => {
+        return accum + current * b[index];
+    }, 0);
+};
+const dotProduct = (vector, matrix) => {
+    return new Float32Array(matrix.map((v) => vectorVectorDot(v, vector)));
+};
+const elementwiseDifference = (a, b, out) => {
+    for (let i = 0; i < a.length; i++) {
+        out[i] = a[i] - b[i];
+    }
+    return out;
+};
+const relu = (vector) => {
+    return vector.map((x) => Math.max(0, x));
 };
 const fetchWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
@@ -37,6 +66,150 @@ const fetchWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
         hand: toContainer(hand),
     };
 });
+const l2Norm = (vec) => {
+    let norm = 0;
+    for (let i = 0; i < vec.length; i++) {
+        norm += Math.pow(vec[i], 2);
+    }
+    return Math.sqrt(norm);
+};
+const zerosLike = (x) => {
+    return new Float32Array(x.length).fill(0);
+};
+const randomProjectionMatrix = (shape, uniformDistributionMin, uniformDistributionMax, probability = 0.97) => {
+    const totalElements = shape[0] * shape[1];
+    const span = uniformDistributionMax - uniformDistributionMin;
+    const mid = span / 2;
+    const rnd = zeros(totalElements).map((x) => {
+        return Math.random() * span - mid;
+    });
+    return twoDimArray(rnd, shape);
+};
+const createHandLandmarker = () => __awaiter(void 0, void 0, void 0, function* () {
+    const vision = yield FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm');
+    const handLandmarker = yield HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task',
+        },
+        numHands: 1,
+        runningMode: 'VIDEO',
+    });
+    return handLandmarker;
+});
+const enableCam = (shadowRoot
+// video: HTMLVideoElement,
+// predictWebcam: () => void
+) => __awaiter(void 0, void 0, void 0, function* () {
+    const stream = yield navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false,
+    });
+    const video = shadowRoot.querySelector('video');
+    video.srcObject = stream;
+    // video.addEventListener('loadeddata', () => {
+    //     predictWebcam();
+    // });
+});
+let lastVideoTime = 0;
+let lastPosition = new Float32Array(21 * 3);
+const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -1, 1, 0.5);
+const colorScheme = [
+    // Coral / Pink Tones
+    'rgb(255, 99, 130)',
+    'rgb(255, 143, 160)',
+    'rgb(255, 181, 194)',
+    // Warm Yellows / Oranges
+    'rgb(255, 207, 64)',
+    'rgb(255, 179, 71)',
+    'rgb(255, 222, 130)',
+    // Greens
+    'rgb(72, 207, 173)',
+    'rgb(112, 219, 182)',
+    'rgb(186, 242, 203)',
+    // Blues
+    'rgb(64, 153, 255)',
+    'rgb(108, 189, 255)',
+    'rgb(179, 220, 255)',
+    // Purples
+    'rgb(149, 117, 205)',
+    'rgb(178, 145, 220)',
+    'rgb(210, 190, 245)',
+    // Neutrals
+    'rgb(240, 240, 240)',
+    'rgb(200, 200, 200)',
+    'rgb(160, 160, 160)',
+    'rgb(100, 100, 100)',
+    'rgb(33, 33, 33)',
+    // Accent
+    'rgb(255, 255, 255)', // White (highlight or background contrast)
+];
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, unit, 
+// projectionMatrix: Float32Array[],
+inputTrigger) => {
+    const predictWebcam = () => {
+        const video = shadowRoot.querySelector('video');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const output = zerosLike(lastPosition);
+        let startTimeMs = performance.now();
+        if (lastVideoTime !== video.currentTime) {
+            const detections = handLandmarker.detectForVideo(video, startTimeMs);
+            // ctx is the plotting canvas' context
+            // w is the width of the canvas
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            // Process and draw landmarks from 'detections'
+            if (detections.landmarks) {
+                const newPosition = new Float32Array(21 * 3);
+                let vecPos = 0;
+                for (let i = 0; i < detections.landmarks.length; i++) {
+                    const landmarks = detections.landmarks[i];
+                    const wl = detections.worldLandmarks[i];
+                    for (let j = 0; j < landmarks.length; j++) {
+                        const landmark = landmarks[j];
+                        const wll = wl[j];
+                        // TODO: This determines whether we're using
+                        // screen-space or world-space
+                        const mappingVector = landmark;
+                        // TODO: This is assuming values in [0, 1]
+                        newPosition[vecPos] = mappingVector.x * 2 - 1;
+                        newPosition[vecPos + 1] = mappingVector.y * 2 - 1;
+                        newPosition[vecPos + 2] = mappingVector.z * 2 - 1;
+                        const x = landmark.x * canvas.width;
+                        const y = landmark.y * canvas.height;
+                        vecPos += 3;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 3.5, 0, 2 * Math.PI);
+                        ctx.fillStyle = colorScheme[j];
+                        ctx.fill();
+                    }
+                }
+                const delta = elementwiseDifference(newPosition, lastPosition, output);
+                const deltaNorm = l2Norm(delta);
+                // TODO: threshold should be based on movement of individual points
+                // rather than the norm of the delta
+                if (deltaNorm > deltaThreshold) {
+                    const matrix = unit.hand;
+                    if (matrix) {
+                        // project the position of all points to the rnn input
+                        // dimensions
+                        const rnnInput = dotProduct(delta, matrix);
+                        // console.log(delta.length, rnnInput.length, matrix.length, matrix[0].length);
+                        // console.log(rnnInput);
+                        // const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
+                        // const sp = relu(rnnInput);
+                        inputTrigger(rnnInput);
+                    }
+                }
+                lastPosition = newPosition;
+            }
+            lastVideoTime = video.currentTime;
+        }
+        requestAnimationFrame(predictWebcam);
+    };
+    return predictWebcam;
+};
 class Mixer {
     constructor(nodes) {
         this.nodes = nodes;
@@ -89,14 +262,6 @@ class Mixer {
         }
     }
 }
-const twoDimArray = (data, shape) => {
-    const [x, y] = shape;
-    const output = [];
-    for (let i = 0; i < data.length; i += y) {
-        output.push(data.slice(i, i + y));
-    }
-    return output;
-};
 const truncate = (arr, threshold, count) => {
     let run = 0;
     for (let i = 0; i < arr.length; i++) {
@@ -144,6 +309,7 @@ class Instrument {
         this.gains = params.gains.array;
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(params.resonances.array, params.resonances.shape);
+        this.hand = twoDimArray(params.hand.array, params.hand.shape);
     }
     static fromURL(url, context, expressivity) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -304,53 +470,136 @@ export class ConvInstrument extends HTMLElement {
         this.url = null;
         this.instrument = null;
         this.context = null;
-        this.initialized = false;
+        this.videoInitialized = false;
+        this.instrumentInitialized = false;
         this.url = null;
+        this.hand = null;
     }
     render() {
         let shadow = this.shadowRoot;
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
         }
+        const renderVector = (currentControlPlaneVector) => {
+            const currentControlPlaneMin = Math.min(...currentControlPlaneVector);
+            const currentControlPlaneMax = Math.max(...currentControlPlaneVector);
+            const currentControlPlaneSpan = currentControlPlaneMax - currentControlPlaneMin;
+            const normalizedControlPlaneVector = currentControlPlaneVector.map((x) => {
+                const shifted = x - currentControlPlaneMin;
+                const scaled = shifted / (currentControlPlaneSpan + 1e-8);
+                return scaled;
+            });
+            const vectorElementHeight = 10;
+            const vectorElementWidth = 10;
+            const valueToRgb = (x) => {
+                const eightBit = x * 255;
+                return `rgba(${eightBit}, ${eightBit}, ${eightBit}, 1.0)`;
+            };
+            return `<svg width="${vectorElementWidth * 64}" height="${vectorElementHeight}">
+                ${Array.from(normalizedControlPlaneVector)
+                .map((x, index) => `<rect 
+                                x="${index * vectorElementWidth}" 
+                                y="${0}" 
+                                width="${vectorElementWidth}" 
+                                height="${vectorElementHeight}"
+                                fill="${valueToRgb(x)}"
+                                stroke="black"
+                            />`)
+                .join('')}
+            </svg>`;
+        };
         shadow.innerHTML = `
             <style>
-                #target {
-                    background-color: blue;
-                    height: 200px;
-                    width: 200px;
-                    cursor: pointer;
+
+                #video-container {
+                    position: relative;
                 }
-            </style>
-            <div id="target"></div>
-        `;
-        const target = shadow.getElementById('target');
-        target.addEventListener('click', () => {
-            this.trigger();
+
+                #canvas-element, 
+                #video-element {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                }
+
+                
+
+                video {
+                    -webkit-transform: scaleX(-1);
+                    transform: scaleX(-1);
+                }
+
+                #start {
+                    position: absolute;
+                    top: 500px;
+                    left: 20px;
+                }
+
+                
+        </style>
+        <div class="instrument-container">
+                <div class="current-event-vector" title="Most recent control-plane input vector">
+                    ${renderVector(zeros(64))}
+                </div>
+                <div id="video-container">
+                    <video autoplay playsinline id="video-element"></video>
+                    <canvas id="canvas-element" width="800" height="800"></canvas>
+                </div>
+                
+        </div>
+        <button id="start">Start Audio</button>
+`;
+        const startButton = shadow.getElementById('start');
+        startButton.addEventListener('click', () => {
+            this.initialize();
         });
+        // const container = shadow.querySelector('.instrument-container');
+        // const eventVectorContainer = shadow.querySelector(
+        //     '.current-event-vector'
+        // );
+        const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
+            const landmarker = yield createHandLandmarker();
+            const canvas = shadow.querySelector('canvas');
+            const ctx = canvas.getContext('2d');
+            enableCam(shadow);
+            const onTrigger = (vec) => {
+                this.trigger(vec);
+                const eventVectorContainer = shadow.querySelector('.current-event-vector');
+                eventVectorContainer.innerHTML = renderVector(vec);
+            };
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, this, onTrigger);
+            const video = shadow.querySelector('video');
+            video.addEventListener('loadeddata', () => {
+                loop();
+            });
+        });
+        if (!this.videoInitialized) {
+            prepareForVideo();
+            this.videoInitialized = true;
+        }
     }
-    trigger() {
+    trigger(vec) {
         return __awaiter(this, void 0, void 0, function* () {
             yield this.initialize();
             if (this.instrument === null) {
                 return;
             }
-            const cp = sparse(0.5, new Float32Array(this.instrument.controlPlaneDim));
-            this.instrument.trigger(cp);
+            this.instrument.trigger(vec);
         });
     }
     initialize() {
         return __awaiter(this, void 0, void 0, function* () {
-            if (this.initialized) {
+            if (this.instrumentInitialized) {
                 return;
             }
             const context = new AudioContext({
                 sampleRate: 22050,
             });
             this.context = context;
-            this.instrument = yield Instrument.fromURL(this.url, 
-            // 'https://resonancemodel.s3.amazonaws.com/resonancemodelparams_1c539593b631a1824f5aaa27d5ee40d3685a5ab0',
-            context, 2);
-            this.initialized = true;
+            this.instrument = yield Instrument.fromURL(this.url, context, 2);
+            // this.hand = this.instrument.hand;
+            this.hand = PROJECTION_MATRIX;
+            this.instrumentInitialized = true;
         });
     }
     connectedCallback() {
