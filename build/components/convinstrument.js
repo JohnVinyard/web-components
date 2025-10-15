@@ -97,6 +97,45 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
+const truncate = (arr, threshold, count) => {
+    let run = 0;
+    for (let i = 0; i < arr.length; i++) {
+        const value = Math.abs(arr[i]);
+        if (value < threshold) {
+            run += 1;
+        }
+        else {
+            run = 0;
+        }
+        if (run >= count) {
+            console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
+            return arr.slice(0, i);
+        }
+    }
+    return arr;
+};
+// const computeStats = (arr: Float32Array): void => {
+//     let mx = 0;
+//     let mn = Number.MAX_VALUE;
+//     let mean = 0;
+//     let sparse = 0;
+//     for (let i = 0; i < arr.length; i++) {
+//         const value = Math.abs(arr[i]);
+//         if (value > mx) {
+//             mx = value;
+//         }
+//         if (value < mn) {
+//             mn = value;
+//         }
+//         mean += value / arr.length;
+//         if (value < 1e-6) {
+//             sparse += 1;
+//         }
+//     }
+//     console.log(mx, mn, mean, sparse / arr.length);
+//     // console.log(`stats: ${Math.max(...arr)}, ${Math.min(...arr)}`);
+//     // return count / arr.length;
+// };
 class Instrument {
     constructor(context, params, expressivity) {
         this.context = context;
@@ -129,14 +168,14 @@ class Instrument {
     buildNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/whitenoise.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
@@ -144,17 +183,17 @@ class Instrument {
             }
             const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
             // TODO: This should probably have n inputs for total resonances
-            const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-                processorOptions: {
-                    gains: this.gains,
-                },
-                numberOfInputs: this.nResonances,
-                numberOfOutputs: this.nResonances,
-                outputChannelCount: Array(this.nResonances).fill(1),
-                channelCount: 1,
-                channelCountMode: 'explicit',
-                channelInterpretation: 'discrete',
-            });
+            // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+            //     processorOptions: {
+            //         gains: this.gains,
+            //     },
+            //     numberOfInputs: this.nResonances,
+            //     numberOfOutputs: this.nResonances,
+            //     outputChannelCount: Array(this.nResonances).fill(1),
+            //     channelCount: 1,
+            //     channelCountMode: 'explicit',
+            //     channelInterpretation: 'discrete',
+            // });
             // Build the last leg;  resonances, each group of which is connected
             // to an outgoing mixer
             const resonances = [];
@@ -166,13 +205,16 @@ class Instrument {
                 for (let j = 0; j < this.expressivity; j++) {
                     const c = this.context.createConvolver();
                     const buffer = this.context.createBuffer(1, this.nSamples, 22050);
-                    buffer.getChannelData(0).set(this.resonances[i + j]);
+                    const res = this.resonances[i + j];
+                    const truncated = truncate(res, 1e-5, 32);
+                    buffer.getChannelData(0).set(truncated);
                     c.buffer = buffer;
                     resonances.push(c);
                     m.acceptConnection(c, j);
                 }
                 const currentChannel = i / this.expressivity;
-                m.connectTo(tanhGain, currentChannel);
+                m.connectTo(this.context.destination);
+                // m.connectTo(tanhGain, currentChannel);
             }
             this.mixers = mixers;
             const gains = [];
@@ -196,15 +238,15 @@ class Instrument {
             // for (const mixer of mixers) {
             //     mixer.connectTo(this.context.destination);
             // }
-            tanhGain.connect(this.context.destination);
+            // tanhGain.connect(this.context.destination);
             this.controlPlane = gains;
         });
     }
     trigger(input) {
         for (let i = 0; i < this.controlPlane.length; i++) {
             const gain = this.controlPlane[i];
-            gain.gain.exponentialRampToValueAtTime(input[i], this.context.currentTime + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, this.context.currentTime + 0.5);
+            gain.gain.linearRampToValueAtTime(input[i], this.context.currentTime + 0.02);
+            gain.gain.linearRampToValueAtTime(0.0001, this.context.currentTime + 0.09);
         }
     }
     deform(mixes) {
@@ -248,7 +290,10 @@ const uniform = (min, max, out) => {
 const sparse = (probability, out) => {
     for (let i = 0; i < out.length; i++) {
         if (Math.random() < probability) {
-            out[i] = 10;
+            out[i] = 0.1;
+        }
+        else {
+            out[i] = 0.0001;
         }
     }
     return out;
@@ -256,9 +301,11 @@ const sparse = (probability, out) => {
 export class ConvInstrument extends HTMLElement {
     constructor() {
         super();
+        this.url = null;
         this.instrument = null;
         this.context = null;
         this.initialized = false;
+        this.url = null;
     }
     render() {
         let shadow = this.shadowRoot;
@@ -287,7 +334,7 @@ export class ConvInstrument extends HTMLElement {
             if (this.instrument === null) {
                 return;
             }
-            const cp = uniform(0.001, 2, new Float32Array(this.instrument.controlPlaneDim));
+            const cp = sparse(0.5, new Float32Array(this.instrument.controlPlaneDim));
             this.instrument.trigger(cp);
         });
     }
@@ -300,7 +347,9 @@ export class ConvInstrument extends HTMLElement {
                 sampleRate: 22050,
             });
             this.context = context;
-            this.instrument = yield Instrument.fromURL('https://resonancemodel.s3.amazonaws.com/resonancemodelparams_6cb84da73946adfec8173ba6d9935143705c0fdd', context, 2);
+            this.instrument = yield Instrument.fromURL(this.url, 
+            // 'https://resonancemodel.s3.amazonaws.com/resonancemodelparams_1c539593b631a1824f5aaa27d5ee40d3685a5ab0',
+            context, 2);
             this.initialized = true;
         });
     }
@@ -308,7 +357,7 @@ export class ConvInstrument extends HTMLElement {
         this.render();
     }
     static get observedAttributes() {
-        return [];
+        return ['url'];
     }
     attributeChangedCallback(property, oldValue, newValue) {
         if (newValue === oldValue) {

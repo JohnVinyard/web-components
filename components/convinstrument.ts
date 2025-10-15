@@ -151,6 +151,60 @@ const twoDimArray = (
     return output;
 };
 
+const truncate = (
+    arr: Float32Array,
+    threshold: number,
+    count: number
+): Float32Array => {
+    let run = 0;
+    for (let i = 0; i < arr.length; i++) {
+        const value = Math.abs(arr[i]);
+        if (value < threshold) {
+            run += 1;
+        } else {
+            run = 0;
+        }
+
+        if (run >= count) {
+            console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
+            return arr.slice(0, i);
+        }
+    }
+
+    return arr;
+};
+
+// const computeStats = (arr: Float32Array): void => {
+//     let mx = 0;
+//     let mn = Number.MAX_VALUE;
+//     let mean = 0;
+//     let sparse = 0;
+
+//     for (let i = 0; i < arr.length; i++) {
+//         const value = Math.abs(arr[i]);
+
+//         if (value > mx) {
+//             mx = value;
+//         }
+
+//         if (value < mn) {
+//             mn = value;
+//         }
+
+//         mean += value / arr.length;
+
+//         if (value < 1e-6) {
+//             sparse += 1;
+//         }
+//     }
+
+//     console.log(mx, mn, mean, sparse / arr.length);
+
+//     // console.log(`stats: ${Math.max(...arr)}, ${Math.min(...arr)}`);
+
+//     // return count / arr.length;
+// };
+
 class Instrument {
     private readonly gains: Float32Array;
     private readonly router: Float32Array[];
@@ -201,7 +255,7 @@ class Instrument {
     public async buildNetwork() {
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/tanh.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/tanh.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -210,7 +264,7 @@ class Instrument {
 
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.80/build/components/whitenoise.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -220,17 +274,17 @@ class Instrument {
         const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
 
         // TODO: This should probably have n inputs for total resonances
-        const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-            processorOptions: {
-                gains: this.gains,
-            },
-            numberOfInputs: this.nResonances,
-            numberOfOutputs: this.nResonances,
-            outputChannelCount: Array(this.nResonances).fill(1),
-            channelCount: 1,
-            channelCountMode: 'explicit',
-            channelInterpretation: 'discrete',
-        });
+        // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+        //     processorOptions: {
+        //         gains: this.gains,
+        //     },
+        //     numberOfInputs: this.nResonances,
+        //     numberOfOutputs: this.nResonances,
+        //     outputChannelCount: Array(this.nResonances).fill(1),
+        //     channelCount: 1,
+        //     channelCountMode: 'explicit',
+        //     channelInterpretation: 'discrete',
+        // });
 
         // Build the last leg;  resonances, each group of which is connected
         // to an outgoing mixer
@@ -249,7 +303,10 @@ class Instrument {
                     this.nSamples,
                     22050
                 );
-                buffer.getChannelData(0).set(this.resonances[i + j]);
+                const res = this.resonances[i + j];
+                const truncated = truncate(res, 1e-5, 32);
+
+                buffer.getChannelData(0).set(truncated);
                 c.buffer = buffer;
 
                 resonances.push(c);
@@ -257,7 +314,8 @@ class Instrument {
             }
 
             const currentChannel = i / this.expressivity;
-            m.connectTo(tanhGain, currentChannel);
+            m.connectTo(this.context.destination);
+            // m.connectTo(tanhGain, currentChannel);
         }
 
         this.mixers = mixers;
@@ -290,7 +348,7 @@ class Instrument {
         //     mixer.connectTo(this.context.destination);
         // }
 
-        tanhGain.connect(this.context.destination);
+        // tanhGain.connect(this.context.destination);
 
         this.controlPlane = gains;
     }
@@ -299,13 +357,13 @@ class Instrument {
         for (let i = 0; i < this.controlPlane.length; i++) {
             const gain = this.controlPlane[i];
 
-            gain.gain.exponentialRampToValueAtTime(
+            gain.gain.linearRampToValueAtTime(
                 input[i],
                 this.context.currentTime + 0.02
             );
-            gain.gain.exponentialRampToValueAtTime(
+            gain.gain.linearRampToValueAtTime(
                 0.0001,
-                this.context.currentTime + 0.5
+                this.context.currentTime + 0.09
             );
         }
     }
@@ -361,19 +419,25 @@ const uniform = (min: number, max: number, out: Float32Array): Float32Array => {
 const sparse = (probability: number, out: Float32Array): Float32Array => {
     for (let i = 0; i < out.length; i++) {
         if (Math.random() < probability) {
-            out[i] = 10;
+            out[i] = 0.1;
+        } else {
+            out[i] = 0.0001;
         }
     }
     return out;
 };
 
 export class ConvInstrument extends HTMLElement {
+
+    public url: string | null = null;
+
     private instrument: Instrument | null = null;
     private context: AudioContext | null = null;
     private initialized: boolean = false;
 
     constructor() {
         super();
+        this.url = null;
     }
 
     private render() {
@@ -408,9 +472,8 @@ export class ConvInstrument extends HTMLElement {
             return;
         }
 
-        const cp = uniform(
-            0.001,
-            2,
+        const cp = sparse(
+            0.5,
             new Float32Array(this.instrument.controlPlaneDim)
         );
         this.instrument.trigger(cp);
@@ -428,7 +491,8 @@ export class ConvInstrument extends HTMLElement {
         this.context = context;
 
         this.instrument = await Instrument.fromURL(
-            'https://resonancemodel.s3.amazonaws.com/resonancemodelparams_6cb84da73946adfec8173ba6d9935143705c0fdd',
+            this.url,
+            // 'https://resonancemodel.s3.amazonaws.com/resonancemodelparams_1c539593b631a1824f5aaa27d5ee40d3685a5ab0',
             context,
             2
         );
@@ -441,7 +505,7 @@ export class ConvInstrument extends HTMLElement {
     }
 
     public static get observedAttributes(): (keyof ConvInstrument)[] {
-        return [];
+        return ['url'];
     }
 
     public attributeChangedCallback(
