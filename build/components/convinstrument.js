@@ -343,7 +343,7 @@ class Instrument {
     buildNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.82/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
@@ -358,7 +358,7 @@ class Instrument {
             //     alert(`Failed to load module due to ${err}`);
             // }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/attackenvelopes.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.82/build/components/attackenvelopes.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);

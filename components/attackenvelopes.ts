@@ -94,4 +94,4 @@ class AttackEnvelope extends AudioWorkletProcessor {
     }
 }
 
-registerProcessor('attack-envelopes', Rnn);
+registerProcessor('attack-envelopes', AttackEnvelope);
