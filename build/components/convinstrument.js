@@ -280,7 +280,7 @@ const truncate = (arr, threshold, count) => {
             run = 0;
         }
         if (run >= count) {
-            console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
+            // console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
             return arr.slice(0, i);
         }
     }
@@ -318,6 +318,7 @@ class Instrument {
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(params.resonances.array, params.resonances.shape);
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
+        this.attackContainer = params.attacks;
         this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
     }
     static fromURL(url, context, expressivity) {
@@ -343,31 +344,22 @@ class Instrument {
     buildNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.83/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
-            // try {
-            //     await this.context.audioWorklet.addModule(
-            //         'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js'
-            //     );
-            // } catch (err) {
-            //     console.log(`Failed to add module due to ${err}`);
-            //     alert(`Failed to load module due to ${err}`);
-            // }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.83/build/components/attackenvelopes.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/attackenvelopes.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
-            // const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
             const attackEnvelopes = new AudioWorkletNode(this.context, 'attack-envelopes', {
                 processorOptions: {
-                    attack: this.attacks,
+                    attack: this.attackContainer,
                 },
                 numberOfOutputs: this.controlPlaneDim,
                 outputChannelCount: Array(this.controlPlaneDim).fill(1),
@@ -376,7 +368,10 @@ class Instrument {
                 channelInterpretation: 'discrete',
             });
             this.controlPlane = attackEnvelopes;
-            // TODO: This should probably have n inputs for total resonances
+            // debugging
+            // for (let i = 0; i < this.controlPlaneDim; i++) {
+            //     attackEnvelopes.connect(this.context.destination, i);
+            // }
             const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
                 processorOptions: {
                     gains: this.gains,
@@ -429,9 +424,7 @@ class Instrument {
                         z.connect(resonances[k]);
                     }
                 }
-                // gains.push(g);
             }
-            // this.controlPlane = gains;
         });
     }
     trigger(input) {
@@ -446,7 +439,7 @@ class Instrument {
         //         this.context.currentTime + 0.09
         //     );
         // }
-        this.controlPlane.port.postMessage(input);
+        this.controlPlane.port.postMessage(vectorScalarMultiply(input, 0.01));
     }
     deform(mixes) {
         for (let i = 0; i < this.totalResonances; i += this.expressivity) {

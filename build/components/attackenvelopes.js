@@ -28,6 +28,7 @@ class AttackEnvelope extends AudioWorkletProcessor {
         for (let e = 0; e < this.eventQueue.length; e += 1) {
             // iterate over each currently active envelope event
             const event = this.eventQueue[e];
+            const gains = event.gains;
             // for each channel of the control plane
             for (let channel = 0; channel < outputs.length; channel += 1) {
                 const ch = outputs[channel][0];
@@ -39,7 +40,7 @@ class AttackEnvelope extends AudioWorkletProcessor {
                     ch[sample] +=
                         this.attack[channel][event.sample + sample] *
                             (Math.random() * 2 - 1) *
-                            event[channel];
+                            gains[channel];
                     event.sample += 1;
                 }
             }
