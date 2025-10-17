@@ -48,5 +48,5 @@ class AttackEnvelope extends AudioWorkletProcessor {
         return true;
     }
 }
-registerProcessor('attack-envelopes', Rnn);
+registerProcessor('attack-envelopes', AttackEnvelope);
 //# sourceMappingURL=attackenvelopes.js.map
