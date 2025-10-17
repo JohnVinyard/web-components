@@ -518,7 +518,7 @@ class Instrument {
     public async buildNetwork() {
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/tanh.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.82/build/components/tanh.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -536,7 +536,7 @@ class Instrument {
 
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/attackenvelopes.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.82/build/components/attackenvelopes.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -622,7 +622,7 @@ class Instrument {
             for (let j = 0; j < this.nResonances; j++) {
                 const z: GainNode = this.context.createGain();
                 z.gain.value = r[j];
-                
+
                 attackEnvelopes.connect(z, i);
                 // g.connect(z);
 
