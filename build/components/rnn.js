@@ -1,4 +1,4 @@
-const twoDimArray = (data, shape) => {
+const twoDArray = (data, shape) => {
     const [x, y] = shape;
     const output = [];
     for (let i = 0; i < data.length; i += y) {
@@ -39,10 +39,10 @@ class Rnn extends AudioWorkletProcessor {
         this.controlPlaneDim = ctorArgs.inProjection.shape[0];
         const hiddenDim = ctorArgs.rnnInProjection.shape[1];
         this.rnnHiddenState = new Float32Array(hiddenDim).fill(0);
-        this.inProjection = twoDimArray(ctorArgs.inProjection.array, ctorArgs.inProjection.shape);
-        this.rnnInProjection = twoDimArray(ctorArgs.rnnInProjection.array, ctorArgs.rnnInProjection.shape);
-        this.rnnOutProjection = twoDimArray(ctorArgs.rnnOutProjection.array, ctorArgs.rnnOutProjection.shape);
-        this.outProjection = twoDimArray(ctorArgs.outProjection.array, ctorArgs.outProjection.shape);
+        this.inProjection = twoDArray(ctorArgs.inProjection.array, ctorArgs.inProjection.shape);
+        this.rnnInProjection = twoDArray(ctorArgs.rnnInProjection.array, ctorArgs.rnnInProjection.shape);
+        this.rnnOutProjection = twoDArray(ctorArgs.rnnOutProjection.array, ctorArgs.rnnOutProjection.shape);
+        this.outProjection = twoDArray(ctorArgs.outProjection.array, ctorArgs.outProjection.shape);
         this.port.onmessage = (event) => {
             this.eventQueue.push(event.data);
         };

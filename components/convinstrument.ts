@@ -86,6 +86,8 @@ interface RawConvInstrumentParams {
     resonances: string;
 
     hand: string;
+
+    attacks: string;
 }
 
 interface ArrayContainer {
@@ -112,18 +114,22 @@ interface ConvInstrumentParams {
     resonances: ArrayContainer;
 
     hand: ArrayContainer;
+
+    attacks: ArrayContainer;
 }
 
 const fetchWeights = async (url: string): Promise<ConvInstrumentParams> => {
     const resp = await fetch(url);
     const data = await resp.json();
 
-    const { gains, router, resonances, hand } = data as RawConvInstrumentParams;
+    const { gains, router, resonances, hand, attacks } =
+        data as RawConvInstrumentParams;
     return {
         gains: toContainer(gains),
         router: toContainer(router),
         resonances: toContainer(resonances),
         hand: toContainer(hand),
+        attacks: toContainer(attacks),
     };
 };
 
@@ -457,10 +463,13 @@ const truncate = (
 
 class Instrument {
     private readonly gains: Float32Array;
+    private readonly attacks: Float32Array[];
     private readonly router: Float32Array[];
     private readonly resonances: Float32Array[];
     public hand: Float32Array[];
-    private controlPlane: GainNode[];
+    private controlPlane: AudioWorkletNode | null;
+
+    // private controlPlane: GainNode[];
     private mixers: Mixer[];
 
     constructor(
@@ -468,6 +477,7 @@ class Instrument {
         private readonly params: ConvInstrumentParams,
         public readonly expressivity: number
     ) {
+        this.controlPlane = null;
         this.gains = params.gains.array;
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(
@@ -475,6 +485,7 @@ class Instrument {
             params.resonances.shape
         );
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
+        this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
     }
 
     public static async fromURL(
@@ -514,16 +525,42 @@ class Instrument {
             alert(`Failed to load module due to ${err}`);
         }
 
+        // try {
+        //     await this.context.audioWorklet.addModule(
+        //         'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js'
+        //     );
+        // } catch (err) {
+        //     console.log(`Failed to add module due to ${err}`);
+        //     alert(`Failed to load module due to ${err}`);
+        // }
+
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/attackenvelopes.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
             alert(`Failed to load module due to ${err}`);
         }
 
-        const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
+        // const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
+
+        const attackEnvelopes = new AudioWorkletNode(
+            this.context,
+            'attack-envelopes',
+            {
+                processorOptions: {
+                    attack: this.attacks,
+                },
+                numberOfOutputs: this.controlPlaneDim,
+                outputChannelCount: Array(this.controlPlaneDim).fill(1),
+                channelCount: 1,
+                channelCountMode: 'explicit',
+                channelInterpretation: 'discrete',
+            }
+        );
+
+        this.controlPlane = attackEnvelopes;
 
         // TODO: This should probably have n inputs for total resonances
         const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
@@ -573,18 +610,21 @@ class Instrument {
 
         this.mixers = mixers;
 
-        const gains: GainNode[] = [];
+        // const gains: GainNode[] = [];
+
         for (let i = 0; i < this.controlPlaneDim; i++) {
-            const g = this.context.createGain();
-            g.gain.value = 0.0001;
-            whiteNoise.connect(g);
+            // const g = this.context.createGain();
+            // g.gain.value = 0.0001;
+            // whiteNoise.connect(g);
 
             const r = this.router[i];
 
             for (let j = 0; j < this.nResonances; j++) {
                 const z: GainNode = this.context.createGain();
                 z.gain.value = r[j];
-                g.connect(z);
+                
+                attackEnvelopes.connect(z, i);
+                // g.connect(z);
 
                 const startIndex: number = j * this.expressivity;
                 const stopIndex = startIndex + this.expressivity;
@@ -594,25 +634,27 @@ class Instrument {
                 }
             }
 
-            gains.push(g);
+            // gains.push(g);
         }
 
-        this.controlPlane = gains;
+        // this.controlPlane = gains;
     }
 
     public trigger(input: Float32Array) {
-        for (let i = 0; i < this.controlPlane.length; i++) {
-            const gain = this.controlPlane[i];
+        // for (let i = 0; i < this.controlPlaneDim; i++) {
+        //     const gain = this.controlPlane[i];
 
-            gain.gain.linearRampToValueAtTime(
-                input[i],
-                this.context.currentTime + 0.02
-            );
-            gain.gain.linearRampToValueAtTime(
-                0.0001,
-                this.context.currentTime + 0.09
-            );
-        }
+        //     gain.gain.linearRampToValueAtTime(
+        //         input[i],
+        //         this.context.currentTime + 0.02
+        //     );
+        //     gain.gain.linearRampToValueAtTime(
+        //         0.0001,
+        //         this.context.currentTime + 0.09
+        //     );
+        // }
+
+        this.controlPlane.port.postMessage(input);
     }
 
     public deform(mixes: Float32Array) {

@@ -58,12 +58,13 @@ const relu = (vector) => {
 const fetchWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
     const data = yield resp.json();
-    const { gains, router, resonances, hand } = data;
+    const { gains, router, resonances, hand, attacks } = data;
     return {
         gains: toContainer(gains),
         router: toContainer(router),
         resonances: toContainer(resonances),
         hand: toContainer(hand),
+        attacks: toContainer(attacks),
     };
 });
 const l2Norm = (vec) => {
@@ -312,10 +313,12 @@ class Instrument {
         this.context = context;
         this.params = params;
         this.expressivity = expressivity;
+        this.controlPlane = null;
         this.gains = params.gains.array;
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(params.resonances.array, params.resonances.shape);
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
+        this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
     }
     static fromURL(url, context, expressivity) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -346,14 +349,33 @@ class Instrument {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
+            // try {
+            //     await this.context.audioWorklet.addModule(
+            //         'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js'
+            //     );
+            // } catch (err) {
+            //     console.log(`Failed to add module due to ${err}`);
+            //     alert(`Failed to load module due to ${err}`);
+            // }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/whitenoise.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.81/build/components/attackenvelopes.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
-            const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
+            // const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
+            const attackEnvelopes = new AudioWorkletNode(this.context, 'attack-envelopes', {
+                processorOptions: {
+                    attack: this.attacks,
+                },
+                numberOfOutputs: this.controlPlaneDim,
+                outputChannelCount: Array(this.controlPlaneDim).fill(1),
+                channelCount: 1,
+                channelCountMode: 'explicit',
+                channelInterpretation: 'discrete',
+            });
+            this.controlPlane = attackEnvelopes;
             // TODO: This should probably have n inputs for total resonances
             const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
                 processorOptions: {
@@ -390,33 +412,41 @@ class Instrument {
                 tanhGain.connect(this.context.destination, currentChannel);
             }
             this.mixers = mixers;
-            const gains = [];
+            // const gains: GainNode[] = [];
             for (let i = 0; i < this.controlPlaneDim; i++) {
-                const g = this.context.createGain();
-                g.gain.value = 0.0001;
-                whiteNoise.connect(g);
+                // const g = this.context.createGain();
+                // g.gain.value = 0.0001;
+                // whiteNoise.connect(g);
                 const r = this.router[i];
                 for (let j = 0; j < this.nResonances; j++) {
                     const z = this.context.createGain();
                     z.gain.value = r[j];
-                    g.connect(z);
+                    attackEnvelopes.connect(z, i);
+                    // g.connect(z);
                     const startIndex = j * this.expressivity;
                     const stopIndex = startIndex + this.expressivity;
                     for (let k = startIndex; k < stopIndex; k += 1) {
                         z.connect(resonances[k]);
                     }
                 }
-                gains.push(g);
+                // gains.push(g);
             }
-            this.controlPlane = gains;
+            // this.controlPlane = gains;
         });
     }
     trigger(input) {
-        for (let i = 0; i < this.controlPlane.length; i++) {
-            const gain = this.controlPlane[i];
-            gain.gain.linearRampToValueAtTime(input[i], this.context.currentTime + 0.02);
-            gain.gain.linearRampToValueAtTime(0.0001, this.context.currentTime + 0.09);
-        }
+        // for (let i = 0; i < this.controlPlaneDim; i++) {
+        //     const gain = this.controlPlane[i];
+        //     gain.gain.linearRampToValueAtTime(
+        //         input[i],
+        //         this.context.currentTime + 0.02
+        //     );
+        //     gain.gain.linearRampToValueAtTime(
+        //         0.0001,
+        //         this.context.currentTime + 0.09
+        //     );
+        // }
+        this.controlPlane.port.postMessage(input);
     }
     deform(mixes) {
         for (let i = 0; i < this.totalResonances; i += this.expressivity) {

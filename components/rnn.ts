@@ -11,7 +11,7 @@ interface RnnParams {
     accelerometerMapping: ArrayContainer;
 }
 
-const twoDimArray = (
+const twoDArray = (
     data: Float32Array,
     shape: [number, number]
 ): Float32Array[] => {
@@ -78,19 +78,19 @@ class Rnn extends AudioWorkletProcessor {
         const hiddenDim = ctorArgs.rnnInProjection.shape[1];
         this.rnnHiddenState = new Float32Array(hiddenDim).fill(0);
 
-        this.inProjection = twoDimArray(
+        this.inProjection = twoDArray(
             ctorArgs.inProjection.array,
             ctorArgs.inProjection.shape
         );
-        this.rnnInProjection = twoDimArray(
+        this.rnnInProjection = twoDArray(
             ctorArgs.rnnInProjection.array,
             ctorArgs.rnnInProjection.shape
         );
-        this.rnnOutProjection = twoDimArray(
+        this.rnnOutProjection = twoDArray(
             ctorArgs.rnnOutProjection.array,
             ctorArgs.rnnOutProjection.shape
         );
-        this.outProjection = twoDimArray(
+        this.outProjection = twoDArray(
             ctorArgs.outProjection.array,
             ctorArgs.outProjection.shape
         );
