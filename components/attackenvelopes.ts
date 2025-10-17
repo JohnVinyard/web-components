@@ -83,8 +83,6 @@ class AttackEnvelope extends AudioWorkletProcessor {
                         this.attack[channel][event.sample + sample] *
                         (Math.random() * 2 - 1) *
                         gains[channel];
-
-                    event.sample += 1;
                 }
             }
 

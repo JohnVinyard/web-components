@@ -320,6 +320,9 @@ class Instrument {
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
         this.attackContainer = params.attacks;
         this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
+        for (const attack of this.attacks) {
+            console.log(attack);
+        }
     }
     static fromURL(url, context, expressivity) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -344,14 +347,14 @@ class Instrument {
     buildNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.85/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/attackenvelopes.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.85/build/components/attackenvelopes.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
@@ -439,7 +442,8 @@ class Instrument {
         //         this.context.currentTime + 0.09
         //     );
         // }
-        this.controlPlane.port.postMessage(vectorScalarMultiply(input, 0.01));
+        console.log('Triggering with', input);
+        this.controlPlane.port.postMessage(input);
     }
     deform(mixes) {
         for (let i = 0; i < this.totalResonances; i += this.expressivity) {

@@ -490,6 +490,10 @@ class Instrument {
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
         this.attackContainer = params.attacks;
         this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
+
+        for (const attack of this.attacks) {
+            console.log(attack);
+        }
     }
 
     public static async fromURL(
@@ -522,7 +526,7 @@ class Instrument {
     public async buildNetwork() {
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/tanh.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.85/build/components/tanh.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -531,7 +535,7 @@ class Instrument {
 
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.84/build/components/attackenvelopes.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.85/build/components/attackenvelopes.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -630,7 +634,6 @@ class Instrument {
                     z.connect(resonances[k]);
                 }
             }
-
         }
     }
 
@@ -648,7 +651,8 @@ class Instrument {
         //     );
         // }
 
-        this.controlPlane.port.postMessage(vectorScalarMultiply(input, 0.01));
+        console.log('Triggering with', input);
+        this.controlPlane.port.postMessage(input);
     }
 
     public deform(mixes: Float32Array) {
