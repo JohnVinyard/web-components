@@ -39,7 +39,6 @@ const twoDimArray = (
     return output;
 };
 
-
 const vectorVectorDot = (a: Float32Array, b: Float32Array): number => {
     return a.reduce((accum, current, index) => {
         return accum + current * b[index];
@@ -140,6 +139,16 @@ const zerosLike = (x: Float32Array): Float32Array => {
     return new Float32Array(x.length).fill(0);
 };
 
+const vectorScalarMultiply = (
+    vec: Float32Array,
+    scalar: number
+): Float32Array => {
+    for (let i = 0; i < vec.length; i++) {
+        vec[i] = vec[i] * scalar;
+    }
+    return vec;
+};
+
 const randomProjectionMatrix = (
     shape: [number, number],
     uniformDistributionMin: number,
@@ -193,7 +202,7 @@ let lastVideoTime: number = 0;
 
 let lastPosition = new Float32Array(21 * 3);
 
-const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -1, 1, 0.5);
+const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -0.5, 0.5, 0.5);
 
 const colorScheme = [
     // Coral / Pink Tones
@@ -318,10 +327,10 @@ const predictWebcamLoop = (
                         const rnnInput = dotProduct(delta, matrix);
                         // console.log(delta.length, rnnInput.length, matrix.length, matrix[0].length);
                         // console.log(rnnInput);
-                        // const scaled = vectorScalarMultiply(rnnInput, deltaNorm);
-                        // const sp = relu(rnnInput);
+                        const scaled = vectorScalarMultiply(rnnInput, 10);
+                        const sp = relu(scaled);
 
-                        inputTrigger(rnnInput);
+                        inputTrigger(sp);
                     }
                 }
 
@@ -391,8 +400,6 @@ class Mixer {
         }
     }
 }
-
-
 
 const truncate = (
     arr: Float32Array,
@@ -519,17 +526,17 @@ class Instrument {
         const whiteNoise = new AudioWorkletNode(this.context, 'white-noise');
 
         // TODO: This should probably have n inputs for total resonances
-        // const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-        //     processorOptions: {
-        //         gains: this.gains,
-        //     },
-        //     numberOfInputs: this.nResonances,
-        //     numberOfOutputs: this.nResonances,
-        //     outputChannelCount: Array(this.nResonances).fill(1),
-        //     channelCount: 1,
-        //     channelCountMode: 'explicit',
-        //     channelInterpretation: 'discrete',
-        // });
+        const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
+            processorOptions: {
+                gains: this.gains,
+            },
+            numberOfInputs: this.nResonances,
+            numberOfOutputs: this.nResonances,
+            outputChannelCount: Array(this.nResonances).fill(1),
+            channelCount: 1,
+            channelCountMode: 'explicit',
+            channelInterpretation: 'discrete',
+        });
 
         // Build the last leg;  resonances, each group of which is connected
         // to an outgoing mixer
@@ -559,8 +566,9 @@ class Instrument {
             }
 
             const currentChannel = i / this.expressivity;
-            m.connectTo(this.context.destination);
-            // m.connectTo(tanhGain, currentChannel);
+            // m.connectTo(this.context.destination);
+            m.connectTo(tanhGain, currentChannel);
+            tanhGain.connect(this.context.destination, currentChannel);
         }
 
         this.mixers = mixers;
@@ -588,12 +596,6 @@ class Instrument {
 
             gains.push(g);
         }
-
-        // for (const mixer of mixers) {
-        //     mixer.connectTo(this.context.destination);
-        // }
-
-        // tanhGain.connect(this.context.destination);
 
         this.controlPlane = gains;
     }
@@ -787,7 +789,7 @@ export class ConvInstrument extends HTMLElement {
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.initialize();
-        })
+        });
 
         // const container = shadow.querySelector('.instrument-container');
         // const eventVectorContainer = shadow.querySelector(
@@ -854,8 +856,8 @@ export class ConvInstrument extends HTMLElement {
 
         this.instrument = await Instrument.fromURL(this.url, context, 2);
 
-        // this.hand = this.instrument.hand;
-        this.hand = PROJECTION_MATRIX;
+        this.hand = this.instrument.hand;
+        // this.hand = PROJECTION_MATRIX;
 
         this.instrumentInitialized = true;
     }
