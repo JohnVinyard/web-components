@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Hand-Controlled WebAudio Instrument</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&family=UnifrakturCook:wght@700&display=swap"
+            rel="stylesheet"
+        />
+        <script src="build/components/bundle.js"></script>
+        <style>
+            body {
+                font-family: 'Roboto', sans-serif;
+            }
+
+            hr {
+                display: block;
+            }
+
+            h2 {
+                text-decoration: underline;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+                height: 100vh;
+                background: radial-gradient(
+                        circle at 20% 30%,
+                        rgba(255, 255, 255, 0.6) 0%,
+                        transparent 60%
+                    ),
+                    radial-gradient(
+                        circle at 80% 70%,
+                        rgba(255, 255, 255, 0.4) 0%,
+                        transparent 60%
+                    ),
+                    linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+                background-blend-mode: soft-light;
+                animation: etherealShift 20s ease-in-out infinite alternate;
+                transition: background 1s ease-in-out;
+                font-family: 'Helvetica Neue', sans-serif;
+            }
+        </style>
+    </head>
+
+    <body>
+        <conv-instrument
+            url="https://resonancemodel.s3.amazonaws.com/resonancemodelparams_bd17c3c9266a2a18882e9d43aeb7808ac7d5544e"
+        ></conv-instrument>
+
+        <!-- <conv-instrument
+            url="https://resonancemodel.s3.amazonaws.com/resonancemodelparams_42d37257c25d85b5379e1d6f9b3bd53c8e82e065"
+        ></conv-instrument> -->
+    </body>
+</html>

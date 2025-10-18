@@ -638,28 +638,20 @@ class Instrument {
     }
 
     public trigger(input: Float32Array) {
-        // for (let i = 0; i < this.controlPlaneDim; i++) {
-        //     const gain = this.controlPlane[i];
-
-        //     gain.gain.linearRampToValueAtTime(
-        //         input[i],
-        //         this.context.currentTime + 0.02
-        //     );
-        //     gain.gain.linearRampToValueAtTime(
-        //         0.0001,
-        //         this.context.currentTime + 0.09
-        //     );
-        // }
-
-        console.log('Triggering with', input);
         this.controlPlane.port.postMessage(input);
     }
 
     public deform(mixes: Float32Array) {
         for (let i = 0; i < this.totalResonances; i += this.expressivity) {
             const slice = mixes.slice(i, i + this.expressivity);
-            this.mixers[i].adjust(slice);
+            const mixerIndex = i / this.expressivity;
+            this.mixers[mixerIndex].adjust(slice);
         }
+    }
+
+    public randomDeformation() {
+        const values = uniform(-1, 1, zeros(this.totalResonances));
+        this.deform(values);
     }
 }
 
@@ -811,6 +803,12 @@ export class ConvInstrument extends HTMLElement {
                     left: 20px;
                 }
 
+                #deform {
+                    position: absolute;
+                    top: 500px;
+                    left: 100px;
+                }
+
                 
         </style>
         <div class="instrument-container">
@@ -824,11 +822,27 @@ export class ConvInstrument extends HTMLElement {
                 
         </div>
         <button id="start">Start Audio</button>
+        <button id="deform">Deform</button>
 `;
 
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.initialize();
+        });
+
+        const deformButton = shadow.getElementById('deform');
+        deformButton.addEventListener('click', () => {
+            if (this.instrument) {
+                this.instrument.randomDeformation();
+            }
+        });
+
+        deformButton.addEventListener('onkeydown', (event: KeyboardEvent) => {
+            if (event.key === 'd') {
+                if (this.instrument) {
+                    this.instrument.randomDeformation();
+                }
+            }
         });
 
         // const container = shadow.querySelector('.instrument-container');
