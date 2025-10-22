@@ -102,7 +102,7 @@ export class AudioView extends HTMLElement {
         this.timeoutHandle = null;
         this.currentEndTimeSeconds = null;
         this.controls = null;
-        this.color = '#33aa55';
+        this.color = '#ededed';
     }
     get showControls() {
         if (this.controls === null || this.controls.toLowerCase() === 'false') {
@@ -196,11 +196,6 @@ export class AudioView extends HTMLElement {
                     background-blend-mode: soft-light;
                 }
 
-                .audio-view-container.playing {
-                    background: rgb(34,193,195);
-                    background: linear-gradient(0deg, rgba(80,80,80,0.5) 0%, rgba(255,255,255,0.5) 40%);
-                }
-
                 .audio-view-controls-container {
                     position: absolute;
                     display: ${this.showControls ? 'block' : 'none'};
@@ -284,7 +279,6 @@ export class AudioView extends HTMLElement {
             this.isPlaying = !this.isPlaying;
             control.innerHTML = this.isPlaying ? 'stop' : 'play';
             const container = this.shadowRoot.querySelector('.audio-view-container');
-            container.classList.remove('playing');
             clearTimeout(this.timeoutHandle);
             if (this.isPlaying) {
                 const startPositionPixels = container.scrollLeft;
@@ -323,7 +317,6 @@ export class AudioView extends HTMLElement {
             const audioView = this.shadowRoot.querySelector('.audio-view-control');
             audioView.innerHTML = 'stop';
             const container = this.shadowRoot.querySelector('.audio-view-container');
-            container.classList.add('playing');
             const canvas = this.shadowRoot.querySelector('canvas');
             canvas.style.filter = '';
             // @ts-ignore
@@ -333,7 +326,6 @@ export class AudioView extends HTMLElement {
                 const audioView = this.shadowRoot.querySelector('.audio-view-control');
                 audioView.innerHTML = 'play';
                 const container = this.shadowRoot.querySelector('.audio-view-container');
-                container.classList.remove('playing');
                 const canvas = this.shadowRoot.querySelector('canvas');
                 // canvas.style.filter = 'blur(2px)';
             }, duration * 1000);
