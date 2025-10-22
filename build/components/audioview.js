@@ -181,8 +181,19 @@ export class AudioView extends HTMLElement {
                     overflow-y: hidden;
                     position: relative;
                     border: solid 1px #eee;
-                    background: rgb(34,193,195);
-                    background: linear-gradient(0deg, rgba(200,200,200,0.5) 0%, rgba(255,255,255,0.5) 100%);
+
+                    background: radial-gradient(
+                        circle at 20% 30%,
+                        rgba(255, 255, 255, 0.6) 0%,
+                        transparent 60%
+                    ),
+                    radial-gradient(
+                        circle at 80% 70%,
+                        rgba(255, 255, 255, 0.4) 0%,
+                        transparent 60%
+                    ),
+                    linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+                    background-blend-mode: soft-light;
                 }
 
                 .audio-view-container.playing {

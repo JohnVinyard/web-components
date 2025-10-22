@@ -596,10 +596,6 @@ export class ConvInstrument extends HTMLElement {
                 }
             }
         });
-        // const container = shadow.querySelector('.instrument-container');
-        // const eventVectorContainer = shadow.querySelector(
-        //     '.current-event-vector'
-        // );
         const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
             const landmarker = yield createHandLandmarker();
             const canvas = shadow.querySelector('canvas');
