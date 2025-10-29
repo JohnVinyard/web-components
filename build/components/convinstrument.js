@@ -58,13 +58,14 @@ const relu = (vector) => {
 const fetchWeights = (url) => __awaiter(void 0, void 0, void 0, function* () {
     const resp = yield fetch(url);
     const data = yield resp.json();
-    const { gains, router, resonances, hand, attacks } = data;
+    const { gains, router, resonances, hand, attacks, mix } = data;
     return {
         gains: toContainer(gains),
         router: toContainer(router),
         resonances: toContainer(resonances),
         hand: toContainer(hand),
         attacks: toContainer(attacks),
+        mix: toContainer(mix),
     };
 });
 const l2Norm = (vec) => {
@@ -235,8 +236,8 @@ class Mixer {
             gain.connect(node, undefined, channel);
         }
     }
-    acceptConnection(node, channel) {
-        node.connect(this.nodes[channel]);
+    acceptConnection(node, mixerChannel, outgoingNodeChannel = undefined) {
+        node.connect(this.nodes[mixerChannel], outgoingNodeChannel);
     }
     randomGains() {
         const vec = new Float32Array(this.nodes.length);
@@ -286,28 +287,6 @@ const truncate = (arr, threshold, count) => {
     }
     return arr;
 };
-// const computeStats = (arr: Float32Array): void => {
-//     let mx = 0;
-//     let mn = Number.MAX_VALUE;
-//     let mean = 0;
-//     let sparse = 0;
-//     for (let i = 0; i < arr.length; i++) {
-//         const value = Math.abs(arr[i]);
-//         if (value > mx) {
-//             mx = value;
-//         }
-//         if (value < mn) {
-//             mn = value;
-//         }
-//         mean += value / arr.length;
-//         if (value < 1e-6) {
-//             sparse += 1;
-//         }
-//     }
-//     console.log(mx, mn, mean, sparse / arr.length);
-//     // console.log(`stats: ${Math.max(...arr)}, ${Math.min(...arr)}`);
-//     // return count / arr.length;
-// };
 class Instrument {
     constructor(context, params, expressivity) {
         this.context = context;
@@ -320,6 +299,7 @@ class Instrument {
         this.hand = twoDimArray(params.hand.array, params.hand.shape);
         this.attackContainer = params.attacks;
         this.attacks = twoDimArray(params.attacks.array, params.attacks.shape);
+        this.mix = twoDimArray(params.mix.array, params.mix.shape);
         for (const attack of this.attacks) {
             console.log(attack);
         }
@@ -328,7 +308,7 @@ class Instrument {
         return __awaiter(this, void 0, void 0, function* () {
             const params = yield fetchWeights(url);
             const instr = new Instrument(context, params, expressivity);
-            yield instr.buildNetwork();
+            yield instr.buildAudioNetwork();
             return instr;
         });
     }
@@ -344,7 +324,7 @@ class Instrument {
     get totalResonances() {
         return this.resonances.length;
     }
-    buildNetwork() {
+    buildAudioNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/tanh.js');
@@ -360,6 +340,8 @@ class Instrument {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
+            const OUTPUT_NOISE_CHANNEL = 0;
+            const OUTPUT_RESONANCE_CHANNEL = 1;
             const attackEnvelopes = new AudioWorkletNode(this.context, 'attack-envelopes', {
                 processorOptions: {
                     attack: this.attackContainer,
@@ -371,6 +353,14 @@ class Instrument {
                 channelInterpretation: 'discrete',
             });
             this.controlPlane = attackEnvelopes;
+            const noiseResonanceMixers = [];
+            for (let i = 0; i < this.nResonances; i++) {
+                const m = Mixer.mixerWithNChannels(this.context, 2);
+                // Set the mix for this resonance channel;  it won't change over time
+                m.adjust(this.mix[i]);
+                noiseResonanceMixers.push(m);
+                m.connectTo(this.context.destination);
+            }
             // debugging
             // for (let i = 0; i < this.controlPlaneDim; i++) {
             //     attackEnvelopes.connect(this.context.destination, i);
@@ -405,24 +395,25 @@ class Instrument {
                     m.acceptConnection(c, j);
                 }
                 const currentChannel = i / this.expressivity;
-                // m.connectTo(this.context.destination);
                 m.connectTo(tanhGain, currentChannel);
-                tanhGain.connect(this.context.destination, currentChannel);
+                // Connect the gain channel to the noise/resonance output mixer
+                noiseResonanceMixers[currentChannel].acceptConnection(tanhGain, OUTPUT_RESONANCE_CHANNEL, currentChannel);
+                // Connect the noise/resonance mixer to the destination
+                // noiseResonanceMixers[i].connectTo(this.context.destination);
             }
             this.mixers = mixers;
-            // const gains: GainNode[] = [];
+            // Route control-plane channels to each resonance
             for (let i = 0; i < this.controlPlaneDim; i++) {
-                // const g = this.context.createGain();
-                // g.gain.value = 0.0001;
-                // whiteNoise.connect(g);
+                // Get the "weight" for this control-plane-to-
+                // resonance connection
                 const r = this.router[i];
                 for (let j = 0; j < this.nResonances; j++) {
                     const z = this.context.createGain();
                     z.gain.value = r[j];
                     attackEnvelopes.connect(z, i);
-                    // g.connect(z);
                     const startIndex = j * this.expressivity;
                     const stopIndex = startIndex + this.expressivity;
+                    noiseResonanceMixers[j].acceptConnection(z, OUTPUT_NOISE_CHANNEL);
                     for (let k = startIndex; k < stopIndex; k += 1) {
                         z.connect(resonances[k]);
                     }

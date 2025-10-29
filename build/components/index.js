@@ -10,5 +10,6 @@ import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
 import { ConvInstrument } from './convinstrument';
 import { ThereminInstrument } from './theremin';
-export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, ConvInstrument, ThereminInstrument, };
+import { PluckStringSimulation } from './pluck';
+export { AudioView, ScatterPlot, TensorView, CodeBlock, CitationBlock, AudioTimeline, Instrument, Sampler, SamplerTest, PhysicalStringSimulation, ConvInstrument, ThereminInstrument, PluckStringSimulation, };
 //# sourceMappingURL=index.js.map

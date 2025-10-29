@@ -10,6 +10,7 @@ import { SamplerTest } from './samplertest';
 import { PhysicalStringSimulation } from './string';
 import { ConvInstrument } from './convinstrument';
 import { ThereminInstrument } from './theremin';
+import { PluckStringSimulation } from './pluck';
 
 export {
     AudioView,
@@ -24,4 +25,5 @@ export {
     PhysicalStringSimulation,
     ConvInstrument,
     ThereminInstrument,
+    PluckStringSimulation,
 };
