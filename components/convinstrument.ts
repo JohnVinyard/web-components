@@ -216,7 +216,13 @@ let lastVideoTime: number = 0;
 
 let lastPosition = new Float32Array(21 * 3);
 
-const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -0.5, 0.5, 0.5);
+// const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -0.5, 0.5, 0.5);
+
+const DEFORMATION_PROJECTION_MATRIX = randomProjectionMatrix(
+    [2, 21 * 3],
+    -1,
+    1
+);
 
 const colorScheme = [
     // Coral / Pink Tones
@@ -257,7 +263,10 @@ const colorScheme = [
 
 interface HasWeights {
     hand: Float32Array[] | null;
+    deformation: Float32Array[] | null;
 }
+
+type DeformationUpdate = (weights: Float32Array) => void;
 
 const predictWebcamLoop = (
     shadowRoot: ShadowRoot,
@@ -266,8 +275,8 @@ const predictWebcamLoop = (
     ctx: CanvasRenderingContext2D,
     deltaThreshold: number,
     unit: HasWeights,
-    // projectionMatrix: Float32Array[],
-    inputTrigger: (vec: Float32Array) => void
+    inputTrigger: (vec: Float32Array) => void,
+    defUpdate: DeformationUpdate
 ): (() => void) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
@@ -297,11 +306,9 @@ const predictWebcamLoop = (
 
                 for (let i = 0; i < detections.landmarks.length; i++) {
                     const landmarks = detections.landmarks[i];
-                    const wl = detections.worldLandmarks[i];
 
                     for (let j = 0; j < landmarks.length; j++) {
                         const landmark = landmarks[j];
-                        const wll = wl[j];
 
                         // TODO: This determines whether we're using
                         // screen-space or world-space
@@ -331,21 +338,25 @@ const predictWebcamLoop = (
                 );
 
                 const deltaNorm = l2Norm(delta);
-                // TODO: threshold should be based on movement of individual points
-                // rather than the norm of the delta
+
                 if (deltaNorm > deltaThreshold) {
+                    // trigger an event if the delta is large enough
                     const matrix = unit.hand;
+
                     if (matrix) {
                         // project the position of all points to the rnn input
                         // dimensions
                         const rnnInput = dotProduct(delta, matrix);
-                        // console.log(delta.length, rnnInput.length, matrix.length, matrix[0].length);
-                        // console.log(rnnInput);
                         const scaled = vectorScalarMultiply(rnnInput, 10);
                         const sp = relu(scaled);
-
                         inputTrigger(sp);
                     }
+                }
+
+                if (unit.deformation) {
+                    // always trigger a deformation
+                    const defInput = dotProduct(delta, unit.deformation);
+                    defUpdate(defInput);
                 }
 
                 lastPosition = newPosition;
@@ -722,6 +733,7 @@ export class ConvInstrument extends HTMLElement {
     private instrumentInitialized: boolean = false;
 
     public hand: Float32Array[] | null;
+    public deformation: Float32Array[] | null;
 
     public open: string;
 
@@ -903,7 +915,12 @@ export class ConvInstrument extends HTMLElement {
                 ctx,
                 0.25,
                 this,
-                onTrigger
+                onTrigger,
+                (weights) => {
+                    if (this.instrument) {
+                        this.instrument.deform(weights);
+                    }
+                }
             );
 
             const video = shadow.querySelector('video');
@@ -942,6 +959,7 @@ export class ConvInstrument extends HTMLElement {
         this.instrument = await Instrument.fromURL(this.url, context, 2);
 
         this.hand = this.instrument.hand;
+        this.deformation = DEFORMATION_PROJECTION_MATRIX;
 
         this.instrumentInitialized = true;
     }
