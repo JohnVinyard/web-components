@@ -194,11 +194,7 @@ const createHandLandmarker = async (): Promise<HandLandmarker> => {
     return handLandmarker;
 };
 
-const enableCam = async (
-    shadowRoot: ShadowRoot
-    // video: HTMLVideoElement,
-    // predictWebcam: () => void
-): Promise<void> => {
+const enableCam = async (shadowRoot: ShadowRoot): Promise<void> => {
     const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false,
@@ -206,17 +202,11 @@ const enableCam = async (
 
     const video = shadowRoot.querySelector('video');
     video.srcObject = stream;
-
-    // video.addEventListener('loadeddata', () => {
-    //     predictWebcam();
-    // });
 };
 
 let lastVideoTime: number = 0;
 
 let lastPosition = new Float32Array(21 * 3);
-
-// const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -0.5, 0.5, 0.5);
 
 const DEFORMATION_PROJECTION_MATRIX = randomProjectionMatrix(
     [2, 21 * 3],
@@ -445,7 +435,6 @@ const truncate = (
         }
 
         if (run >= count) {
-            // console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
             return arr.slice(0, i);
         }
     }
@@ -567,9 +556,6 @@ class Instrument {
             m.connectTo(this.context.destination);
         }
 
-        // debugging
-        // for (let i = 0; i < this.controlPlaneDim; i++) {
-        //     attackEnvelopes.connect(this.context.destination, i);
         // }
 
         const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
@@ -622,7 +608,6 @@ class Instrument {
             );
 
             // Connect the noise/resonance mixer to the destination
-            // noiseResonanceMixers[i].connectTo(this.context.destination);
         }
 
         this.mixers = mixers;
