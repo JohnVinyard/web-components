@@ -488,11 +488,27 @@ export class ConvInstrument extends HTMLElement {
         this.instrumentInitialized = false;
         this.url = null;
         this.hand = null;
+        this.open = 'false';
+    }
+    get isOpen() {
+        return this.open === 'true';
     }
     render() {
         let shadow = this.shadowRoot;
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
+        }
+        if (!this.isOpen) {
+            shadow.innerHTML = `
+                <button id="start">Open Hand-Controlled Instrument</button>
+            `;
+            const startButton = shadow.getElementById('start');
+            startButton.addEventListener('click', () => {
+                this.setAttribute('open', 'true');
+            });
+            this.videoInitialized = false;
+            this.instrumentInitialized = false;
+            return;
         }
         const renderVector = (currentControlPlaneVector) => {
             const currentControlPlaneMin = Math.min(...currentControlPlaneVector);
@@ -549,10 +565,10 @@ export class ConvInstrument extends HTMLElement {
                     left: 20px;
                 }
 
-                #deform {
+                #close {
                     position: absolute;
                     top: 500px;
-                    left: 100px;
+                    left: 200px;
                 }
 
                 
@@ -568,24 +584,15 @@ export class ConvInstrument extends HTMLElement {
                 
         </div>
         <button id="start">Start Audio</button>
-        <button id="deform">Deform</button>
+        <button id="close">Close</button>
 `;
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.initialize();
         });
-        const deformButton = shadow.getElementById('deform');
-        deformButton.addEventListener('click', () => {
-            if (this.instrument) {
-                this.instrument.randomDeformation();
-            }
-        });
-        deformButton.addEventListener('onkeydown', (event) => {
-            if (event.key === 'd') {
-                if (this.instrument) {
-                    this.instrument.randomDeformation();
-                }
-            }
+        const closeButton = shadow.getElementById('close');
+        closeButton.addEventListener('click', () => {
+            this.setAttribute('open', 'false');
         });
         const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
             const landmarker = yield createHandLandmarker();
@@ -636,7 +643,7 @@ export class ConvInstrument extends HTMLElement {
         this.render();
     }
     static get observedAttributes() {
-        return ['url'];
+        return ['url', 'open'];
     }
     attributeChangedCallback(property, oldValue, newValue) {
         if (newValue === oldValue) {

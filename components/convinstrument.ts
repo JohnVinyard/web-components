@@ -723,10 +723,17 @@ export class ConvInstrument extends HTMLElement {
 
     public hand: Float32Array[] | null;
 
+    public open: string;
+
     constructor() {
         super();
         this.url = null;
         this.hand = null;
+        this.open = 'false';
+    }
+
+    public get isOpen(): boolean {
+        return this.open === 'true';
     }
 
     private render() {
@@ -734,6 +741,20 @@ export class ConvInstrument extends HTMLElement {
 
         if (!shadow) {
             shadow = this.attachShadow({ mode: 'open' });
+        }
+
+        if (!this.isOpen) {
+            shadow.innerHTML = `
+                <button id="start">Open Hand-Controlled Instrument</button>
+            `;
+
+            const startButton = shadow.getElementById('start');
+            startButton.addEventListener('click', () => {
+                this.setAttribute('open', 'true');
+            });
+            this.videoInitialized = false;
+            this.instrumentInitialized = false;
+            return;
         }
 
         const renderVector = (
@@ -809,10 +830,10 @@ export class ConvInstrument extends HTMLElement {
                     left: 20px;
                 }
 
-                #deform {
+                #close {
                     position: absolute;
                     top: 500px;
-                    left: 100px;
+                    left: 200px;
                 }
 
                 
@@ -828,7 +849,7 @@ export class ConvInstrument extends HTMLElement {
                 
         </div>
         <button id="start">Start Audio</button>
-        <button id="deform">Deform</button>
+        <button id="close">Close</button>
 `;
 
         const startButton = shadow.getElementById('start');
@@ -836,19 +857,9 @@ export class ConvInstrument extends HTMLElement {
             this.initialize();
         });
 
-        const deformButton = shadow.getElementById('deform');
-        deformButton.addEventListener('click', () => {
-            if (this.instrument) {
-                this.instrument.randomDeformation();
-            }
-        });
-
-        deformButton.addEventListener('onkeydown', (event: KeyboardEvent) => {
-            if (event.key === 'd') {
-                if (this.instrument) {
-                    this.instrument.randomDeformation();
-                }
-            }
+        const closeButton = shadow.getElementById('close');
+        closeButton.addEventListener('click', () => {
+            this.setAttribute('open', 'false');
         });
 
         const prepareForVideo = async () => {
@@ -912,7 +923,6 @@ export class ConvInstrument extends HTMLElement {
         this.instrument = await Instrument.fromURL(this.url, context, 2);
 
         this.hand = this.instrument.hand;
-        // this.hand = PROJECTION_MATRIX;
 
         this.instrumentInitialized = true;
     }
@@ -922,7 +932,7 @@ export class ConvInstrument extends HTMLElement {
     }
 
     public static get observedAttributes(): (keyof ConvInstrument)[] {
-        return ['url'];
+        return ['url', 'open'];
     }
 
     public attributeChangedCallback(
