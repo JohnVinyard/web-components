@@ -541,6 +541,12 @@ export class ConvInstrument extends HTMLElement {
         shadow.innerHTML = `
             <style>
 
+                dialog {
+                    position: relative;
+                    width: 90vw;
+                    height: 90vw;
+                }
+
                 #video-container {
                     position: relative;
                 }
@@ -571,20 +577,33 @@ export class ConvInstrument extends HTMLElement {
                     left: 200px;
                 }
 
+                ::backdrop {
+                    background-image: linear-gradient(
+                        45deg,
+                        magenta,
+                        rebeccapurple,
+                        dodgerblue,
+                        green
+                    );
+                    opacity: 0.75;
+                }
+
                 
         </style>
-        <div class="instrument-container">
-                <div class="current-event-vector" title="Most recent control-plane input vector">
-                    ${renderVector(zeros(64))}
-                </div>
-                <div id="video-container">
-                    <video autoplay playsinline id="video-element"></video>
-                    <canvas id="canvas-element" width="800" height="800"></canvas>
-                </div>
-                
-        </div>
-        <button id="start">Start Audio</button>
-        <button id="close">Close</button>
+        <dialog open>
+            <div class="instrument-container">
+                    <div class="current-event-vector" title="Most recent control-plane input vector">
+                        ${renderVector(zeros(64))}
+                    </div>
+                    <div id="video-container">
+                        <video autoplay playsinline id="video-element"></video>
+                        <canvas id="canvas-element" width="800" height="800"></canvas>
+                    </div>
+                    
+            </div>
+            <button id="start">Start Audio</button>
+            <button id="close">Close</button>
+        </dialog>
 `;
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
@@ -635,7 +654,6 @@ export class ConvInstrument extends HTMLElement {
             this.context = context;
             this.instrument = yield Instrument.fromURL(this.url, context, 2);
             this.hand = this.instrument.hand;
-            // this.hand = PROJECTION_MATRIX;
             this.instrumentInitialized = true;
         });
     }
