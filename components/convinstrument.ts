@@ -401,10 +401,15 @@ class Mixer {
     public adjust(gainValues: Float32Array) {
         const vec = new Float32Array(gainValues.length);
         const sm = softmax(gainValues, vec);
+
         console.log(`Setting gains ${sm}`);
         for (let i = 0; i < this.nodes.length; i++) {
-            const node = this.nodes[i];
-            node.gain.value = sm[i];
+            try {
+                const node = this.nodes[i];
+                node.gain.value = sm[i];
+            } catch (err) {
+                console.log(`Failed to set gain with ${sm[i]}`);
+            }
         }
     }
 
@@ -643,11 +648,16 @@ class Instrument {
         this.controlPlane.port.postMessage(input);
     }
 
-    public deform(mixes: Float32Array) {
-        for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-            const slice = mixes.slice(i, i + this.expressivity);
-            const mixerIndex = i / this.expressivity;
-            this.mixers[mixerIndex].adjust(slice);
+    public deform(mix: Float32Array) {
+        // for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+        //     const slice = mixes.slice(i, i + this.expressivity);
+        //     const mixerIndex = i / this.expressivity;
+        //     this.mixers[mixerIndex].adjust(slice);
+        // }
+
+        // The resonance mixes are tied across all channels/routes
+        for (let i = 0; i < this.nResonances; i += 1) {
+            this.mixers[i].adjust(mix);
         }
     }
 

@@ -104,23 +104,16 @@ const createHandLandmarker = () => __awaiter(void 0, void 0, void 0, function* (
     });
     return handLandmarker;
 });
-const enableCam = (shadowRoot
-// video: HTMLVideoElement,
-// predictWebcam: () => void
-) => __awaiter(void 0, void 0, void 0, function* () {
+const enableCam = (shadowRoot) => __awaiter(void 0, void 0, void 0, function* () {
     const stream = yield navigator.mediaDevices.getUserMedia({
         video: true,
         audio: false,
     });
     const video = shadowRoot.querySelector('video');
     video.srcObject = stream;
-    // video.addEventListener('loadeddata', () => {
-    //     predictWebcam();
-    // });
 });
 let lastVideoTime = 0;
 let lastPosition = new Float32Array(21 * 3);
-// const PROJECTION_MATRIX = randomProjectionMatrix([16, 21 * 3], -0.5, 0.5, 0.5);
 const DEFORMATION_PROJECTION_MATRIX = randomProjectionMatrix([2, 21 * 3], -1, 1);
 const colorScheme = [
     // Coral / Pink Tones
@@ -253,8 +246,13 @@ class Mixer {
         const sm = softmax(gainValues, vec);
         console.log(`Setting gains ${sm}`);
         for (let i = 0; i < this.nodes.length; i++) {
-            const node = this.nodes[i];
-            node.gain.value = sm[i];
+            try {
+                const node = this.nodes[i];
+                node.gain.value = sm[i];
+            }
+            catch (err) {
+                console.log(`Failed to set gain with ${sm[i]}`);
+            }
         }
     }
     oneHot(index) {
@@ -280,7 +278,6 @@ const truncate = (arr, threshold, count) => {
             run = 0;
         }
         if (run >= count) {
-            // console.log(`Was ${arr.length} now ${i}, ${i / arr.length}`);
             return arr.slice(0, i);
         }
     }
@@ -360,9 +357,6 @@ class Instrument {
                 noiseResonanceMixers.push(m);
                 m.connectTo(this.context.destination);
             }
-            // debugging
-            // for (let i = 0; i < this.controlPlaneDim; i++) {
-            //     attackEnvelopes.connect(this.context.destination, i);
             // }
             const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
                 processorOptions: {
@@ -398,7 +392,6 @@ class Instrument {
                 // Connect the gain channel to the noise/resonance output mixer
                 noiseResonanceMixers[currentChannel].acceptConnection(tanhGain, OUTPUT_RESONANCE_CHANNEL, currentChannel);
                 // Connect the noise/resonance mixer to the destination
-                // noiseResonanceMixers[i].connectTo(this.context.destination);
             }
             this.mixers = mixers;
             // Route control-plane channels to each resonance
@@ -423,11 +416,15 @@ class Instrument {
     trigger(input) {
         this.controlPlane.port.postMessage(input);
     }
-    deform(mixes) {
-        for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-            const slice = mixes.slice(i, i + this.expressivity);
-            const mixerIndex = i / this.expressivity;
-            this.mixers[mixerIndex].adjust(slice);
+    deform(mix) {
+        // for (let i = 0; i < this.totalResonances; i += this.expressivity) {
+        //     const slice = mixes.slice(i, i + this.expressivity);
+        //     const mixerIndex = i / this.expressivity;
+        //     this.mixers[mixerIndex].adjust(slice);
+        // }
+        // The resonance mixes are tied across all channels/routes
+        for (let i = 0; i < this.nResonances; i += 1) {
+            this.mixers[i].adjust(mix);
         }
     }
     randomDeformation() {
