@@ -649,12 +649,6 @@ class Instrument {
     }
 
     public deform(mix: Float32Array) {
-        // for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-        //     const slice = mixes.slice(i, i + this.expressivity);
-        //     const mixerIndex = i / this.expressivity;
-        //     this.mixers[mixerIndex].adjust(slice);
-        // }
-
         // The resonance mixes are tied across all channels/routes
         for (let i = 0; i < this.nResonances; i += 1) {
             this.mixers[i].adjust(mix);
