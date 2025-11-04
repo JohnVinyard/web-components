@@ -267,9 +267,13 @@ const predictWebcamLoop = (
     unit: HasWeights,
     inputTrigger: (vec: Float32Array) => void,
     defUpdate: DeformationUpdate
-): (() => void) => {
-    const predictWebcam = () => {
+): (() => number) => {
+    const predictWebcam = (): number => {
         const video = shadowRoot.querySelector('video');
+
+        if (!video) {
+            return 0;
+        }
 
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
@@ -353,7 +357,8 @@ const predictWebcamLoop = (
             }
             lastVideoTime = video.currentTime;
         }
-        requestAnimationFrame(predictWebcam);
+
+        return requestAnimationFrame(predictWebcam);
     };
 
     return predictWebcam;
@@ -402,7 +407,6 @@ class Mixer {
         const vec = new Float32Array(gainValues.length);
         const sm = softmax(gainValues, vec);
 
-        console.log(`Setting gains ${sm}`);
         for (let i = 0; i < this.nodes.length; i++) {
             try {
                 const node = this.nodes[i];
@@ -483,6 +487,10 @@ class Instrument {
         for (const attack of this.attacks) {
             console.log(attack);
         }
+    }
+
+    public async close() {
+        this.context.close();
     }
 
     public static async fromURL(
@@ -726,6 +734,8 @@ export class ConvInstrument extends HTMLElement {
 
     public open: string;
 
+    private animationLoopHandle: number | null = null;
+
     constructor() {
         super();
         this.url = null;
@@ -809,8 +819,8 @@ export class ConvInstrument extends HTMLElement {
 
                 dialog {
                     position: relative;
-                    width: 90vw;
-                    height: 90vw;
+                    height: 90vh;
+                    padding: 20px;
                 }
 
                 #video-container {
@@ -844,19 +854,13 @@ export class ConvInstrument extends HTMLElement {
                 }
 
                 ::backdrop {
-                    background-image: linear-gradient(
-                        45deg,
-                        magenta,
-                        rebeccapurple,
-                        dodgerblue,
-                        green
-                    );
+                    background-color: #333;
                     opacity: 0.75;
                 }
 
                 
         </style>
-        <dialog open>
+        <dialog>
             <div class="instrument-container">
                     <div class="current-event-vector" title="Most recent control-plane input vector">
                         ${renderVector(zeros(64))}
@@ -872,14 +876,26 @@ export class ConvInstrument extends HTMLElement {
         </dialog>
 `;
 
+        const dialog = shadow.querySelector('dialog') as HTMLDialogElement;
+        dialog.showModal();
+
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.initialize();
         });
 
         const closeButton = shadow.getElementById('close');
-        closeButton.addEventListener('click', () => {
+        closeButton.addEventListener('click', async () => {
             this.setAttribute('open', 'false');
+
+            await this.instrument.close();
+            this.instrument = null;
+            this.videoInitialized = false;
+            this.instrumentInitialized = false;
+            if (this.animationLoopHandle) {
+                cancelAnimationFrame(this.animationLoopHandle);
+            }
+            this.animationLoopHandle = null;
         });
 
         const prepareForVideo = async () => {
@@ -906,15 +922,16 @@ export class ConvInstrument extends HTMLElement {
                 this,
                 onTrigger,
                 (weights) => {
-                    if (this.instrument) {
-                        this.instrument.deform(weights);
-                    }
+                    // TODO: Temporarily disabling deformations
+                    // if (this.instrument) {
+                    //     this.instrument.deform(weights);
+                    // }
                 }
             );
 
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {
-                loop();
+                this.animationLoopHandle = loop();
             });
         };
 

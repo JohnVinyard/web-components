@@ -316,7 +316,6 @@ export class AudioView extends HTMLElement {
             this.isPlaying = true;
             const audioView = this.shadowRoot.querySelector('.audio-view-control');
             audioView.innerHTML = 'stop';
-            const container = this.shadowRoot.querySelector('.audio-view-container');
             const canvas = this.shadowRoot.querySelector('canvas');
             canvas.style.filter = '';
             // @ts-ignore
@@ -325,9 +324,6 @@ export class AudioView extends HTMLElement {
                 this.playingBuffer = null;
                 const audioView = this.shadowRoot.querySelector('.audio-view-control');
                 audioView.innerHTML = 'play';
-                const container = this.shadowRoot.querySelector('.audio-view-container');
-                const canvas = this.shadowRoot.querySelector('canvas');
-                // canvas.style.filter = 'blur(2px)';
             }, duration * 1000);
         });
     }

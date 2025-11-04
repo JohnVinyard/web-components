@@ -474,9 +474,6 @@ export class AudioView extends HTMLElement {
 
         const audioView = this.shadowRoot.querySelector('.audio-view-control');
         audioView.innerHTML = 'stop';
-        const container = this.shadowRoot.querySelector(
-            '.audio-view-container'
-        );
 
         const canvas = this.shadowRoot.querySelector('canvas');
         canvas.style.filter = '';
@@ -489,12 +486,6 @@ export class AudioView extends HTMLElement {
                 '.audio-view-control'
             );
             audioView.innerHTML = 'play';
-
-            const container = this.shadowRoot.querySelector(
-                '.audio-view-container'
-            );
-            const canvas = this.shadowRoot.querySelector('canvas');
-            // canvas.style.filter = 'blur(2px)';
         }, duration * 1000);
     }
 

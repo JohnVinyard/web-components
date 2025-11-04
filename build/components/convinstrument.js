@@ -148,6 +148,9 @@ const colorScheme = [
 const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, unit, inputTrigger, defUpdate) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
+        if (!video) {
+            return 0;
+        }
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -206,7 +209,7 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
             }
             lastVideoTime = video.currentTime;
         }
-        requestAnimationFrame(predictWebcam);
+        return requestAnimationFrame(predictWebcam);
     };
     return predictWebcam;
 };
@@ -244,7 +247,6 @@ class Mixer {
     adjust(gainValues) {
         const vec = new Float32Array(gainValues.length);
         const sm = softmax(gainValues, vec);
-        console.log(`Setting gains ${sm}`);
         for (let i = 0; i < this.nodes.length; i++) {
             try {
                 const node = this.nodes[i];
@@ -299,6 +301,11 @@ class Instrument {
         for (const attack of this.attacks) {
             console.log(attack);
         }
+    }
+    close() {
+        return __awaiter(this, void 0, void 0, function* () {
+            this.context.close();
+        });
     }
     static fromURL(url, context, expressivity) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -477,6 +484,7 @@ export class ConvInstrument extends HTMLElement {
         this.context = null;
         this.videoInitialized = false;
         this.instrumentInitialized = false;
+        this.animationLoopHandle = null;
         this.url = null;
         this.hand = null;
         this.open = 'false';
@@ -534,8 +542,8 @@ export class ConvInstrument extends HTMLElement {
 
                 dialog {
                     position: relative;
-                    width: 90vw;
-                    height: 90vw;
+                    height: 90vh;
+                    padding: 20px;
                 }
 
                 #video-container {
@@ -569,19 +577,13 @@ export class ConvInstrument extends HTMLElement {
                 }
 
                 ::backdrop {
-                    background-image: linear-gradient(
-                        45deg,
-                        magenta,
-                        rebeccapurple,
-                        dodgerblue,
-                        green
-                    );
+                    background-color: #333;
                     opacity: 0.75;
                 }
 
                 
         </style>
-        <dialog open>
+        <dialog>
             <div class="instrument-container">
                     <div class="current-event-vector" title="Most recent control-plane input vector">
                         ${renderVector(zeros(64))}
@@ -596,14 +598,24 @@ export class ConvInstrument extends HTMLElement {
             <button id="close">Close</button>
         </dialog>
 `;
+        const dialog = shadow.querySelector('dialog');
+        dialog.showModal();
         const startButton = shadow.getElementById('start');
         startButton.addEventListener('click', () => {
             this.initialize();
         });
         const closeButton = shadow.getElementById('close');
-        closeButton.addEventListener('click', () => {
+        closeButton.addEventListener('click', () => __awaiter(this, void 0, void 0, function* () {
             this.setAttribute('open', 'false');
-        });
+            yield this.instrument.close();
+            this.instrument = null;
+            this.videoInitialized = false;
+            this.instrumentInitialized = false;
+            if (this.animationLoopHandle) {
+                cancelAnimationFrame(this.animationLoopHandle);
+            }
+            this.animationLoopHandle = null;
+        }));
         const prepareForVideo = () => __awaiter(this, void 0, void 0, function* () {
             const landmarker = yield createHandLandmarker();
             const canvas = shadow.querySelector('canvas');
@@ -615,13 +627,14 @@ export class ConvInstrument extends HTMLElement {
                 eventVectorContainer.innerHTML = renderVector(vec);
             };
             const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.25, this, onTrigger, (weights) => {
-                if (this.instrument) {
-                    this.instrument.deform(weights);
-                }
+                // TODO: Temporarily disabling deformations
+                // if (this.instrument) {
+                //     this.instrument.deform(weights);
+                // }
             });
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {
-                loop();
+                this.animationLoopHandle = loop();
             });
         });
         if (!this.videoInitialized) {
