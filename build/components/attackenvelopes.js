@@ -6,18 +6,27 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
+const isCommandEvent = (d) => {
+    return (d === null || d === void 0 ? void 0 : d.command) === 'close';
+};
 class AttackEnvelope extends AudioWorkletProcessor {
     constructor(options) {
         super();
         this.eventQueue = [];
+        this.running = true;
         const ctorArgs = options.processorOptions;
         console.log(`Constructing AttackEnvelope with attacks of shape ${ctorArgs.attack.shape}`);
         this.attack = twoDimArray(ctorArgs.attack.array, ctorArgs.attack.shape);
         this.envelopeLength = this.attack[0].length;
         this.port.onmessage = (event) => {
-            // events will each be a single control plan vector, determining
-            // the gain of each attack channel
-            this.eventQueue.push({ gains: event.data, sample: 0 });
+            if (isCommandEvent(event.data)) {
+                this.running = false;
+            }
+            else {
+                // events will each be a single control plan vector, determining
+                // the gain of each attack channel
+                this.eventQueue.push({ gains: event.data, sample: 0 });
+            }
         };
     }
     process(inputs, outputs, parameters) {
@@ -45,7 +54,7 @@ class AttackEnvelope extends AudioWorkletProcessor {
             }
             event.sample += samplesInBlock;
         }
-        return true;
+        return this.running;
     }
 }
 registerProcessor('attack-envelopes', AttackEnvelope);

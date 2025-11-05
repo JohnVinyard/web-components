@@ -4,4 +4,4 @@ google-chrome \
     --allow-file-access \
     --allow-cross-origin-auth-prompt \
     --new-window \
-    conv-instrument.html
+    index.html

@@ -13,8 +13,14 @@ interface AudioWorkletNodeOptions extends AudioNodeOptions {
 class Tanh extends AudioWorkletProcessor {
     constructor(options) {
         super();
+        this.running = true;
         const { gains } = options.processorOptions;
         this.gains = gains;
+        this.port.onmessage = (event) => {
+            if (event.data.command === 'close') {
+                this.running = false;
+            }
+        };
     }
     process(inputs, outputs, parameters) {
         for (let i = 0; i < inputs.length; i++) {
@@ -28,7 +34,7 @@ class Tanh extends AudioWorkletProcessor {
                 out[j] = Math.tanh(inp[j] * this.gains[i]);
             }
         }
-        return true;
+        return this.running;
     }
 }
 registerProcessor('tanh-gain', Tanh);

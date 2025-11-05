@@ -20,6 +20,14 @@ const twoDimArray = (
     return output;
 };
 
+interface CommandEvent {
+    command: 'close';
+}
+
+const isCommandEvent = (d: any): d is CommandEvent => {
+    return (d as CommandEvent)?.command === 'close';
+};
+
 interface EnvelopeStatus {
     gains: Float32Array;
     sample: number;
@@ -31,6 +39,7 @@ class AttackEnvelope extends AudioWorkletProcessor {
     private eventQueue: EnvelopeStatus[] = [];
 
     private envelopeLength: number;
+    private running: boolean = true;
 
     constructor(options: AudioWorkletNodeOptions) {
         super();
@@ -44,10 +53,16 @@ class AttackEnvelope extends AudioWorkletProcessor {
         this.attack = twoDimArray(ctorArgs.attack.array, ctorArgs.attack.shape);
         this.envelopeLength = this.attack[0].length;
 
-        this.port.onmessage = (event: MessageEvent<Float32Array>) => {
-            // events will each be a single control plan vector, determining
-            // the gain of each attack channel
-            this.eventQueue.push({ gains: event.data, sample: 0 });
+        this.port.onmessage = (
+            event: MessageEvent<Float32Array | CommandEvent>
+        ) => {
+            if (isCommandEvent(event.data)) {
+                this.running = false;
+            } else {
+                // events will each be a single control plan vector, determining
+                // the gain of each attack channel
+                this.eventQueue.push({ gains: event.data, sample: 0 });
+            }
         };
     }
 
@@ -89,7 +104,7 @@ class AttackEnvelope extends AudioWorkletProcessor {
             event.sample += samplesInBlock;
         }
 
-        return true;
+        return this.running;
     }
 }
 

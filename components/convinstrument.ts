@@ -451,6 +451,12 @@ const truncate = (
     return arr;
 };
 
+interface CommandEvent {
+    command: 'close';
+}
+
+const CLOSE_COMMAND: CommandEvent = { command: 'close' };
+
 class Instrument {
     private readonly gains: Float32Array;
     private readonly attacks: Float32Array[];
@@ -460,7 +466,10 @@ class Instrument {
     private readonly router: Float32Array[];
     private readonly resonances: Float32Array[];
     public hand: Float32Array[];
+
     private controlPlane: AudioWorkletNode | null;
+    private tanhGain: AudioWorkletNode | null;
+
     private mix: Float32Array[];
 
     // private controlPlane: GainNode[];
@@ -473,6 +482,8 @@ class Instrument {
         public readonly expressivity: number
     ) {
         this.controlPlane = null;
+        this.tanhGain = null;
+
         this.gains = params.gains.array;
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(
@@ -490,6 +501,10 @@ class Instrument {
     }
 
     public async close() {
+        this.tanhGain.port.postMessage(CLOSE_COMMAND);
+        this.controlPlane.port.postMessage(CLOSE_COMMAND);
+        this.tanhGain.disconnect();
+        this.controlPlane.disconnect();
         this.context.close();
     }
 

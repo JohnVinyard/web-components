@@ -285,12 +285,14 @@ const truncate = (arr, threshold, count) => {
     }
     return arr;
 };
+const CLOSE_COMMAND = { command: 'close' };
 class Instrument {
     constructor(context, params, expressivity) {
         this.context = context;
         this.params = params;
         this.expressivity = expressivity;
         this.controlPlane = null;
+        this.tanhGain = null;
         this.gains = params.gains.array;
         this.router = twoDimArray(params.router.array, params.router.shape);
         this.resonances = twoDimArray(params.resonances.array, params.resonances.shape);
@@ -304,6 +306,10 @@ class Instrument {
     }
     close() {
         return __awaiter(this, void 0, void 0, function* () {
+            this.tanhGain.port.postMessage(CLOSE_COMMAND);
+            this.controlPlane.port.postMessage(CLOSE_COMMAND);
+            this.tanhGain.disconnect();
+            this.controlPlane.disconnect();
             this.context.close();
         });
     }

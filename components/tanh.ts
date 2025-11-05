@@ -12,17 +12,29 @@ interface TanhParams {
     gains: Float32Array;
 }
 
+interface CommandEvent {
+    command: 'close';
+}
+
 /**
  * A single node will handle all resonance outputs from the model
  */
 class Tanh extends AudioWorkletProcessor {
     private readonly gains: Float32Array;
 
+    private running: boolean = true;
+
     constructor(options: AudioWorkletNodeOptions) {
         super();
 
         const { gains }: TanhParams = options.processorOptions;
         this.gains = gains;
+
+        this.port.onmessage = (event: MessageEvent<CommandEvent>) => {
+            if (event.data.command === 'close') {
+                this.running = false;
+            }
+        };
     }
 
     process(
@@ -44,7 +56,7 @@ class Tanh extends AudioWorkletProcessor {
             }
         }
 
-        return true;
+        return this.running;
     }
 }
 
