@@ -300,13 +300,15 @@ const predictWebcamLoop = (
 
                 for (let i = 0; i < detections.landmarks.length; i++) {
                     const landmarks = detections.landmarks[i];
+                    const wlm = detections.worldLandmarks[i];
 
                     for (let j = 0; j < landmarks.length; j++) {
                         const landmark = landmarks[j];
+                        const wl = wlm[j];
 
                         // TODO: This determines whether we're using
                         // screen-space or world-space
-                        const mappingVector = landmark;
+                        const mappingVector = wl;
 
                         // TODO: This is assuming values in [0, 1]
                         newPosition[vecPos] = mappingVector.x * 2 - 1;
@@ -933,14 +935,13 @@ export class ConvInstrument extends HTMLElement {
                 landmarker,
                 canvas,
                 ctx,
-                0.25,
+                0.1,
                 this,
                 onTrigger,
                 (weights) => {
-                    // TODO: Temporarily disabling deformations
-                    // if (this.instrument) {
-                    //     this.instrument.deform(weights);
-                    // }
+                    if (this.instrument) {
+                        this.instrument.deform(weights);
+                    }
                 }
             );
 
