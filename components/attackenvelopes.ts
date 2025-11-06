@@ -5,6 +5,7 @@ interface ArrayContainer {
 
 interface AttackEnvelopeParams {
     attack: ArrayContainer;
+    routing: ArrayContainer;
 }
 
 const twoDimArray = (
@@ -20,6 +21,10 @@ const twoDimArray = (
     return output;
 };
 
+const toArray = ({ array, shape }: ArrayContainer): Float32Array[] => {
+    return twoDimArray(array, shape);
+};
+
 interface CommandEvent {
     command: 'close';
 }
@@ -33,8 +38,19 @@ interface EnvelopeStatus {
     sample: number;
 }
 
+const vvd = (a: Float32Array, b: Float32Array): number => {
+    return a.reduce((accum, current, index) => {
+        return accum + current * b[index];
+    }, 0);
+};
+
+const dot = (vector: Float32Array, matrix: Float32Array[]): Float32Array => {
+    return new Float32Array(matrix.map((v) => vvd(v, vector)));
+};
+
 class AttackEnvelope extends AudioWorkletProcessor {
     private readonly attack: Float32Array[];
+    private readonly routing: Float32Array[];
 
     private eventQueue: EnvelopeStatus[] = [];
 
@@ -50,8 +66,12 @@ class AttackEnvelope extends AudioWorkletProcessor {
             `Constructing AttackEnvelope with attacks of shape ${ctorArgs.attack.shape}`
         );
 
-        this.attack = twoDimArray(ctorArgs.attack.array, ctorArgs.attack.shape);
+        const { attack, routing } = ctorArgs;
+
+        this.attack = toArray(attack);
         this.envelopeLength = this.attack[0].length;
+
+        this.routing = toArray(routing);
 
         this.port.onmessage = (
             event: MessageEvent<Float32Array | CommandEvent>
@@ -59,9 +79,11 @@ class AttackEnvelope extends AudioWorkletProcessor {
             if (isCommandEvent(event.data)) {
                 this.running = false;
             } else {
+                const routed = dot(event.data, this.routing);
+
                 // events will each be a single control plan vector, determining
                 // the gain of each attack channel
-                this.eventQueue.push({ gains: event.data, sample: 0 });
+                this.eventQueue.push({ gains: routed, sample: 0 });
             }
         };
     }
