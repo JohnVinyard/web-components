@@ -145,7 +145,7 @@ const colorScheme = [
     // Accent
     'rgb(255, 255, 255)', // White (highlight or background contrast)
 ];
-const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, unit, inputTrigger, defUpdate) => {
+const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThreshold, deltaMax, unit, inputTrigger, defUpdate) => {
     const predictWebcam = () => {
         const video = shadowRoot.querySelector('video');
         if (!video) {
@@ -190,9 +190,12 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                 }
                 const delta = elementwiseDifference(newPosition, lastPosition, output);
                 const deltaNorm = l2Norm(delta);
-                if (deltaNorm > deltaThreshold) {
+                // Ensure that an event is triggered and that it won't
+                // be overly-loud
+                if (deltaNorm > deltaThreshold && deltaNorm < deltaMax) {
                     // trigger an event if the delta is large enough
                     const matrix = unit.hand;
+                    console.log('NORM', deltaNorm);
                     if (matrix) {
                         // project the position of all points to the rnn input
                         // dimensions
@@ -248,9 +251,9 @@ class Mixer {
     }
     adjust(gainValues) {
         const vec = new Float32Array(gainValues.length);
-        console.log('pre-softmax', vec);
+        // console.log('pre-softmax', vec);
         const sm = softmax(gainValues, vec);
-        console.log('post-softmax', sm);
+        // console.log('post-softmax', sm);
         for (let i = 0; i < this.nodes.length; i++) {
             try {
                 const node = this.nodes[i];
@@ -337,14 +340,14 @@ class Instrument {
     buildAudioNetwork() {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/tanh.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.93/build/components/tanh.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
                 alert(`Failed to load module due to ${err}`);
             }
             try {
-                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/attackenvelopes.js');
+                yield this.context.audioWorklet.addModule('https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.93/build/components/attackenvelopes.js');
             }
             catch (err) {
                 console.log(`Failed to add module due to ${err}`);
@@ -748,10 +751,12 @@ export class ConvInstrument extends HTMLElement {
                 const eventVectorContainer = shadow.querySelector('.current-event-vector');
                 eventVectorContainer.innerHTML = renderVector(vec);
             };
-            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.1, this, onTrigger, (weights) => {
-                if (this.instrument) {
-                    this.instrument.deform(weights);
-                }
+            const loop = predictWebcamLoop(shadow, landmarker, canvas, ctx, 0.1, // norm threshold
+            1.0, // norm max (to prevent overly loud sounds)
+            this, onTrigger, (weights) => {
+                // if (this.instrument) {
+                //     this.instrument.deform(weights);
+                // }
             });
             const video = shadow.querySelector('video');
             video.addEventListener('loadeddata', () => {

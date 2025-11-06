@@ -264,6 +264,7 @@ const predictWebcamLoop = (
     canvas: HTMLCanvasElement,
     ctx: CanvasRenderingContext2D,
     deltaThreshold: number,
+    deltaMax: number,
     unit: HasWeights,
     inputTrigger: (vec: Float32Array) => void,
     defUpdate: DeformationUpdate
@@ -335,7 +336,9 @@ const predictWebcamLoop = (
 
                 const deltaNorm = l2Norm(delta);
 
-                if (deltaNorm > deltaThreshold) {
+                // Ensure that an event is triggered and that it won't
+                // be overly-loud
+                if (deltaNorm > deltaThreshold && deltaNorm < deltaMax) {
                     // trigger an event if the delta is large enough
                     const matrix = unit.hand;
 
@@ -407,9 +410,9 @@ class Mixer {
 
     public adjust(gainValues: Float32Array) {
         const vec = new Float32Array(gainValues.length);
-        console.log('pre-softmax', vec);
+        // console.log('pre-softmax', vec);
         const sm = softmax(gainValues, vec);
-        console.log('post-softmax', sm);
+        // console.log('post-softmax', sm);
         for (let i = 0; i < this.nodes.length; i++) {
             try {
                 const node = this.nodes[i];
@@ -537,7 +540,7 @@ class Instrument {
     public async buildAudioNetwork() {
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/tanh.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.93/build/components/tanh.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -546,7 +549,7 @@ class Instrument {
 
         try {
             await this.context.audioWorklet.addModule(
-                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/attackenvelopes.js'
+                'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.93/build/components/attackenvelopes.js'
             );
         } catch (err) {
             console.log(`Failed to add module due to ${err}`);
@@ -1072,13 +1075,14 @@ export class ConvInstrument extends HTMLElement {
                 landmarker,
                 canvas,
                 ctx,
-                0.1,
+                0.1, // norm threshold
+                1.0, // norm max (to prevent overly loud sounds)
                 this,
                 onTrigger,
                 (weights) => {
-                    if (this.instrument) {
-                        this.instrument.deform(weights);
-                    }
+                    // if (this.instrument) {
+                    //     this.instrument.deform(weights);
+                    // }
                 }
             );
 
