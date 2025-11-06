@@ -297,6 +297,8 @@ const predictWebcamLoop = (
             // Process and draw landmarks from 'detections'
             if (detections.landmarks) {
                 const newPosition = new Float32Array(21 * 3);
+                let zPos = 0;
+
                 let vecPos = 0;
 
                 for (let i = 0; i < detections.landmarks.length; i++) {
@@ -306,6 +308,11 @@ const predictWebcamLoop = (
                     for (let j = 0; j < landmarks.length; j++) {
                         const landmark = landmarks[j];
                         const wl = wlm[j];
+
+                        if (j === 8) {
+                            // Z position of index finger
+                            zPos = landmark.z;
+                        }
 
                         // TODO: This determines whether we're using
                         // screen-space or world-space
@@ -339,6 +346,7 @@ const predictWebcamLoop = (
                 // Ensure that an event is triggered and that it won't
                 // be overly-loud
                 if (deltaNorm > deltaThreshold && deltaNorm < deltaMax) {
+                    // console.log('Z', zPos);
                     // trigger an event if the delta is large enough
                     const matrix = unit.hand;
 
@@ -354,8 +362,14 @@ const predictWebcamLoop = (
 
                 if (unit.deformation) {
                     // always trigger a deformation
-                    const defInput = dotProduct(delta, unit.deformation);
-                    defUpdate(defInput);
+                    // const defInput = dotProduct(delta, unit.deformation);
+                    // defUpdate(defInput);
+                    defUpdate(
+                        new Float32Array([
+                            Math.abs(0 - Math.abs(zPos)) * 10,
+                            Math.abs(0.5 - Math.abs(zPos)) * 10,
+                        ])
+                    );
                 }
 
                 lastPosition = newPosition;
@@ -410,9 +424,7 @@ class Mixer {
 
     public adjust(gainValues: Float32Array) {
         const vec = new Float32Array(gainValues.length);
-        // console.log('pre-softmax', vec);
         const sm = softmax(gainValues, vec);
-        // console.log('post-softmax', sm);
         for (let i = 0; i < this.nodes.length; i++) {
             try {
                 const node = this.nodes[i];
@@ -1080,9 +1092,9 @@ export class ConvInstrument extends HTMLElement {
                 this,
                 onTrigger,
                 (weights) => {
-                    // if (this.instrument) {
-                    //     this.instrument.deform(weights);
-                    // }
+                    if (this.instrument) {
+                        this.instrument.deform(weights);
+                    }
                 }
             );
 
