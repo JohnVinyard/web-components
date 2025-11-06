@@ -6,8 +6,19 @@ const twoDimArray = (data, shape) => {
     }
     return output;
 };
+const toArray = ({ array, shape }) => {
+    return twoDimArray(array, shape);
+};
 const isCommandEvent = (d) => {
     return (d === null || d === void 0 ? void 0 : d.command) === 'close';
+};
+const vvd = (a, b) => {
+    return a.reduce((accum, current, index) => {
+        return accum + current * b[index];
+    }, 0);
+};
+const dot = (vector, matrix) => {
+    return new Float32Array(matrix.map((v) => vvd(v, vector)));
 };
 class AttackEnvelope extends AudioWorkletProcessor {
     constructor(options) {
@@ -16,16 +27,19 @@ class AttackEnvelope extends AudioWorkletProcessor {
         this.running = true;
         const ctorArgs = options.processorOptions;
         console.log(`Constructing AttackEnvelope with attacks of shape ${ctorArgs.attack.shape}`);
-        this.attack = twoDimArray(ctorArgs.attack.array, ctorArgs.attack.shape);
+        const { attack, routing } = ctorArgs;
+        this.attack = toArray(attack);
         this.envelopeLength = this.attack[0].length;
+        this.routing = toArray(routing);
         this.port.onmessage = (event) => {
             if (isCommandEvent(event.data)) {
                 this.running = false;
             }
             else {
+                const routed = dot(event.data, this.routing);
                 // events will each be a single control plan vector, determining
                 // the gain of each attack channel
-                this.eventQueue.push({ gains: event.data, sample: 0 });
+                this.eventQueue.push({ gains: routed, sample: 0 });
             }
         };
     }
