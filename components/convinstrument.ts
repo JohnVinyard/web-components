@@ -366,8 +366,8 @@ const predictWebcamLoop = (
                     // defUpdate(defInput);
                     defUpdate(
                         new Float32Array([
-                            Math.abs(0 - Math.abs(zPos)) * 10,
                             Math.abs(0.5 - Math.abs(zPos)) * 10,
+                            Math.abs(0 - Math.abs(zPos)) * 10,
                         ])
                     );
                 }

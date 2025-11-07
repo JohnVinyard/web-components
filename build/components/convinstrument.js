@@ -215,8 +215,8 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                     // const defInput = dotProduct(delta, unit.deformation);
                     // defUpdate(defInput);
                     defUpdate(new Float32Array([
-                        Math.abs(0 - Math.abs(zPos)) * 10,
                         Math.abs(0.5 - Math.abs(zPos)) * 10,
+                        Math.abs(0 - Math.abs(zPos)) * 10,
                     ]));
                 }
                 lastPosition = newPosition;
