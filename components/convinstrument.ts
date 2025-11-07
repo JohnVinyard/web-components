@@ -354,7 +354,7 @@ const predictWebcamLoop = (
                         // project the position of all points to the rnn input
                         // dimensions
                         const rnnInput = dotProduct(delta, matrix);
-                        const scaled = vectorScalarMultiply(rnnInput, 10);
+                        const scaled = vectorScalarMultiply(rnnInput, 20);
                         const sp = relu(scaled);
                         inputTrigger(sp);
                     }
