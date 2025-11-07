@@ -409,6 +409,9 @@ class Instrument {
                 const currentChannel = i / this.expressivity;
                 for (let j = 0; j < this.expressivity; j++) {
                     const c = this.context.createConvolver();
+                    // The default here is true, but we've already scaled
+                    // the resonances the way we'd like them
+                    c.normalize = false;
                     const buffer = this.context.createBuffer(1, this.nSamples, 22050);
                     const res = this.resonances[i + j];
                     const truncated = truncate(res, 1e-5, 32);

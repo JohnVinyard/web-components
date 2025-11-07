@@ -635,6 +635,9 @@ class Instrument {
 
             for (let j = 0; j < this.expressivity; j++) {
                 const c = this.context.createConvolver();
+                // The default here is true, but we've already scaled
+                // the resonances the way we'd like them
+                c.normalize = false;
                 const buffer = this.context.createBuffer(
                     1,
                     this.nSamples,

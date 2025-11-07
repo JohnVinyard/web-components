@@ -39,13 +39,23 @@ interface EnvelopeStatus {
 }
 
 const vvd = (a: Float32Array, b: Float32Array): number => {
-    return a.reduce((accum, current, index) => {
-        return accum + current * b[index];
-    }, 0);
+    let result = 0;
+    for (let i = 0; i < a.length; i++) {
+        result += a[i] * b[i];
+    }
+    return result;
+    // return a.reduce((accum, current, index) => {
+    //     return accum + current * b[index];
+    // }, 0);
 };
 
 const dot = (vector: Float32Array, matrix: Float32Array[]): Float32Array => {
-    return new Float32Array(matrix.map((v) => vvd(v, vector)));
+    // return new Float32Array(matrix.map((v) => vvd(v, vector)));
+    const output = new Float32Array(matrix.length);
+    for (let i = 0; i < matrix.length; i++) {
+        output[i] = vvd(vector, matrix[i]);
+    }
+    return output;
 };
 
 class AttackEnvelope extends AudioWorkletProcessor {
