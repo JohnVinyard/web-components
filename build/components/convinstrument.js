@@ -205,7 +205,7 @@ const predictWebcamLoop = (shadowRoot, handLandmarker, canvas, ctx, deltaThresho
                         // project the position of all points to the rnn input
                         // dimensions
                         const rnnInput = dotProduct(delta, matrix);
-                        const scaled = vectorScalarMultiply(rnnInput, 20);
+                        const scaled = vectorScalarMultiply(rnnInput, 30);
                         const sp = relu(scaled);
                         inputTrigger(sp);
                     }
@@ -377,16 +377,16 @@ class Instrument {
             });
             this.controlPlane = attackEnvelopes;
             // There is a noise/resonance mix for each channel
-            const noiseResonanceMixers = [];
-            for (let i = 0; i < this.nResonances; i++) {
-                const m = Mixer.mixerWithNChannels(this.context, 2);
-                // Set the mix for this resonance channel;  it won't change over time
-                m.adjust(this.mix[i]);
-                noiseResonanceMixers.push(m);
-                m.connectTo(this.context.destination);
-                // connect attack directly to the noise side of the output mixer
-                m.acceptConnection(attackEnvelopes, OUTPUT_NOISE_CHANNEL, i);
-            }
+            // const noiseResonanceMixers: Mixer[] = [];
+            // for (let i = 0; i < this.nResonances; i++) {
+            //     const m = Mixer.mixerWithNChannels(this.context, 2);
+            //     // Set the mix for this resonance channel;  it won't change over time
+            //     m.adjust(this.mix[i]);
+            //     noiseResonanceMixers.push(m);
+            //     m.connectTo(this.context.destination);
+            //     // connect attack directly to the noise side of the output mixer
+            //     m.acceptConnection(attackEnvelopes, OUTPUT_NOISE_CHANNEL, i);
+            // }
             const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
                 processorOptions: {
                     gains: this.gains,
@@ -398,6 +398,9 @@ class Instrument {
                 channelCountMode: 'explicit',
                 channelInterpretation: 'discrete',
             });
+            for (let i = 0; i < this.nResonances; i++) {
+                tanhGain.connect(this.context.destination, i);
+            }
             // Build the last leg;  resonances, each group of which is connected
             // to an outgoing mixer
             const resonances = [];
@@ -423,138 +426,15 @@ class Instrument {
                 }
                 m.connectTo(tanhGain, currentChannel);
                 // Connect the gain channel to the resonance side of the output mixer
-                noiseResonanceMixers[currentChannel].acceptConnection(tanhGain, OUTPUT_RESONANCE_CHANNEL, currentChannel);
+                // noiseResonanceMixers[currentChannel].acceptConnection(
+                //     tanhGain,
+                //     OUTPUT_RESONANCE_CHANNEL,
+                //     currentChannel
+                // );
             }
             this.expressivityMixers = expressivityMixers;
-            // Route control-plane channels to each resonance
-            // for (let i = 0; i < this.controlPlaneDim; i++) {
-            //     // Get the "weight" for this control-plane-to-
-            //     // resonance connection
-            //     const r = this.router[i];
-            //     for (let j = 0; j < this.nResonances; j++) {
-            //         const z: GainNode = this.context.createGain();
-            //         z.gain.value = r[j];
-            //         attackEnvelopes.connect(z, i);
-            //         const startIndex: number = j * this.expressivity;
-            //         const stopIndex = startIndex + this.expressivity;
-            //         noiseResonanceMixers[j].acceptConnection(
-            //             z,
-            //             OUTPUT_NOISE_CHANNEL
-            //         );
-            //         for (let k = startIndex; k < stopIndex; k += 1) {
-            //             z.connect(resonances[k]);
-            //         }
-            //     }
-            // }
         });
     }
-    // public async buildAudioNetwork() {
-    //     try {
-    //         await this.context.audioWorklet.addModule(
-    //             'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/tanh.js'
-    //         );
-    //     } catch (err) {
-    //         console.log(`Failed to add module due to ${err}`);
-    //         alert(`Failed to load module due to ${err}`);
-    //     }
-    //     try {
-    //         await this.context.audioWorklet.addModule(
-    //             'https://cdn.jsdelivr.net/gh/JohnVinyard/web-components@0.0.87/build/components/attackenvelopes.js'
-    //         );
-    //     } catch (err) {
-    //         console.log(`Failed to add module due to ${err}`);
-    //         alert(`Failed to load module due to ${err}`);
-    //     }
-    //     const OUTPUT_NOISE_CHANNEL = 0;
-    //     const OUTPUT_RESONANCE_CHANNEL = 1;
-    //     const attackEnvelopes = new AudioWorkletNode(
-    //         this.context,
-    //         'attack-envelopes',
-    //         {
-    //             processorOptions: {
-    //                 attack: this.attackContainer,
-    //             },
-    //             numberOfOutputs: this.controlPlaneDim,
-    //             outputChannelCount: Array(this.controlPlaneDim).fill(1),
-    //             channelCount: 1,
-    //             channelCountMode: 'explicit',
-    //             channelInterpretation: 'discrete',
-    //         }
-    //     );
-    //     this.controlPlane = attackEnvelopes;
-    //     const noiseResonanceMixers: Mixer[] = [];
-    //     for (let i = 0; i < this.nResonances; i++) {
-    //         const m = Mixer.mixerWithNChannels(this.context, 2);
-    //         // Set the mix for this resonance channel;  it won't change over time
-    //         m.adjust(this.mix[i]);
-    //         noiseResonanceMixers.push(m);
-    //         m.connectTo(this.context.destination);
-    //     }
-    //     const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
-    //         processorOptions: {
-    //             gains: this.gains,
-    //         },
-    //         numberOfInputs: this.nResonances,
-    //         numberOfOutputs: this.nResonances,
-    //         outputChannelCount: Array(this.nResonances).fill(1),
-    //         channelCount: 1,
-    //         channelCountMode: 'explicit',
-    //         channelInterpretation: 'discrete',
-    //     });
-    //     // Build the last leg;  resonances, each group of which is connected
-    //     // to an outgoing mixer
-    //     const resonances: ConvolverNode[] = [];
-    //     const mixers: Mixer[] = [];
-    //     for (let i = 0; i < this.totalResonances; i += this.expressivity) {
-    //         const m = Mixer.mixerWithNChannels(this.context, this.expressivity);
-    //         m.oneHot(0);
-    //         mixers.push(m);
-    //         for (let j = 0; j < this.expressivity; j++) {
-    //             const c = this.context.createConvolver();
-    //             const buffer = this.context.createBuffer(
-    //                 1,
-    //                 this.nSamples,
-    //                 22050
-    //             );
-    //             const res = this.resonances[i + j];
-    //             const truncated = truncate(res, 1e-5, 32);
-    //             buffer.getChannelData(0).set(truncated);
-    //             c.buffer = buffer;
-    //             resonances.push(c);
-    //             m.acceptConnection(c, j);
-    //         }
-    //         const currentChannel = i / this.expressivity;
-    //         m.connectTo(tanhGain, currentChannel);
-    //         // Connect the gain channel to the noise/resonance output mixer
-    //         noiseResonanceMixers[currentChannel].acceptConnection(
-    //             tanhGain,
-    //             OUTPUT_RESONANCE_CHANNEL,
-    //             currentChannel
-    //         );
-    //         // Connect the noise/resonance mixer to the destination
-    //     }
-    //     this.mixers = mixers;
-    //     // Route control-plane channels to each resonance
-    //     for (let i = 0; i < this.controlPlaneDim; i++) {
-    //         // Get the "weight" for this control-plane-to-
-    //         // resonance connection
-    //         const r = this.router[i];
-    //         for (let j = 0; j < this.nResonances; j++) {
-    //             const z: GainNode = this.context.createGain();
-    //             z.gain.value = r[j];
-    //             attackEnvelopes.connect(z, i);
-    //             const startIndex: number = j * this.expressivity;
-    //             const stopIndex = startIndex + this.expressivity;
-    //             noiseResonanceMixers[j].acceptConnection(
-    //                 z,
-    //                 OUTPUT_NOISE_CHANNEL
-    //             );
-    //             for (let k = startIndex; k < stopIndex; k += 1) {
-    //                 z.connect(resonances[k]);
-    //             }
-    //         }
-    //     }
-    // }
     trigger(input) {
         this.controlPlane.port.postMessage(input);
     }
