@@ -377,16 +377,16 @@ class Instrument {
             });
             this.controlPlane = attackEnvelopes;
             // There is a noise/resonance mix for each channel
-            // const noiseResonanceMixers: Mixer[] = [];
-            // for (let i = 0; i < this.nResonances; i++) {
-            //     const m = Mixer.mixerWithNChannels(this.context, 2);
-            //     // Set the mix for this resonance channel;  it won't change over time
-            //     m.adjust(this.mix[i]);
-            //     noiseResonanceMixers.push(m);
-            //     m.connectTo(this.context.destination);
-            //     // connect attack directly to the noise side of the output mixer
-            //     m.acceptConnection(attackEnvelopes, OUTPUT_NOISE_CHANNEL, i);
-            // }
+            const noiseResonanceMixers = [];
+            for (let i = 0; i < this.nResonances; i++) {
+                const m = Mixer.mixerWithNChannels(this.context, 2);
+                // Set the mix for this resonance channel;  it won't change over time
+                m.adjust(this.mix[i]);
+                noiseResonanceMixers.push(m);
+                m.connectTo(this.context.destination);
+                // connect attack directly to the noise side of the output mixer
+                m.acceptConnection(attackEnvelopes, OUTPUT_NOISE_CHANNEL, i);
+            }
             const tanhGain = new AudioWorkletNode(this.context, 'tanh-gain', {
                 processorOptions: {
                     gains: this.gains,
@@ -398,9 +398,9 @@ class Instrument {
                 channelCountMode: 'explicit',
                 channelInterpretation: 'discrete',
             });
-            for (let i = 0; i < this.nResonances; i++) {
-                tanhGain.connect(this.context.destination, i);
-            }
+            // for (let i = 0; i < this.nResonances; i++) {
+            //     tanhGain.connect(this.context.destination, i);
+            // }
             // Build the last leg;  resonances, each group of which is connected
             // to an outgoing mixer
             const resonances = [];
@@ -426,11 +426,7 @@ class Instrument {
                 }
                 m.connectTo(tanhGain, currentChannel);
                 // Connect the gain channel to the resonance side of the output mixer
-                // noiseResonanceMixers[currentChannel].acceptConnection(
-                //     tanhGain,
-                //     OUTPUT_RESONANCE_CHANNEL,
-                //     currentChannel
-                // );
+                noiseResonanceMixers[currentChannel].acceptConnection(tanhGain, OUTPUT_RESONANCE_CHANNEL, currentChannel);
             }
             this.expressivityMixers = expressivityMixers;
         });
