@@ -417,7 +417,7 @@ class Instrument {
                     c.normalize = false;
                     const buffer = this.context.createBuffer(1, this.nSamples, 22050);
                     const res = this.resonances[i + j];
-                    const truncated = truncate(res, 1e-5, 32);
+                    const truncated = truncate(res, 1e-12, 32);
                     buffer.getChannelData(0).set(truncated);
                     c.buffer = buffer;
                     attackEnvelopes.connect(c, currentChannel);
@@ -552,7 +552,6 @@ export class ConvInstrument extends HTMLElement {
             <style>
 
                 dialog {
-                    position: relative;
                     height: 90vh;
                     padding: 20px;
                 }
