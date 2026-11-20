@@ -281,11 +281,16 @@ class SpringMesh {
     }
 }
 /**
- * Randomly-placed masses joined by randomly-chosen springs.  This has no
- * well-defined fundamental, so it keeps the stiffness it has always had
- * (tension 0.1, mass 20).
+ * Randomly-placed masses joined by randomly-chosen springs (two per mass,
+ * on average).  This has no well-defined fundamental, so it keeps the
+ * stiffness it has always had (tension 0.1, mass 20).
+ *
+ * Unlike the string and plate, adding masses doesn't lower the pitch: springs
+ * join arbitrary pairs of masses, so there's no "distance" for a wave to
+ * cross, and the modes stay in roughly the same range (~100-800Hz at the
+ * default stiffness).  More masses just pack more modes into it.
  */
-const buildRandom = (nMasses = 64) => {
+const buildRandom = (nMasses = 512) => {
     const masses = [];
     for (let i = 0; i < nMasses; i++) {
         const position = new Float32Array([
