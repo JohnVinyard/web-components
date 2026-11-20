@@ -236,7 +236,7 @@ export class PluckStringSimulation extends HTMLElement {
                 <option value="string" selected>String</option>
                 <option value="plate">Plate</option>
                 <option value="random">Random</option>
-                <option value="multi-string">Multi-String</option>
+                <option value="multi-string">Harp</option>
             </select>
         </div>
         <div class="control">
