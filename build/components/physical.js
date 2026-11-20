@@ -1,337 +1,376 @@
-// TODO: for-loop and out parameter
-const elementwiseDifference = (a, b, out) => {
-    for (let i = 0; i < a.length; i++) {
-        out[i] = a[i] - b[i];
-    }
-    return out;
+/**
+ * Spring-mass synthesis, computed one sample at a time in an AudioWorklet.
+ *
+ * Each spring pulls its two masses back toward their *original offset* from
+ * one another (rather than toward a rest length), so the force on m1 is
+ *
+ *     k * ((p1_0 - p2_0) - (p1 - p2)) = k * (u2 - u1)
+ *
+ * where u = position - originalPosition is each mass's displacement.  The
+ * system is therefore linear, and the x and y axes are independent.  We
+ * simulate displacement directly, using flat typed arrays (struct-of-arrays)
+ * rather than an object per mass/spring.
+ *
+ * Only the x axis contributes to the audio output; y is simulated so that the
+ * visualization (which draws both axes) behaves as before.
+ *
+ * Stiffness, pitch and stability
+ * ------------------------------
+ * Mass, tension and damping are shared by every mass/spring in a mesh, and
+ * the dynamics depend only on the ratio k/m (tension / mass).  With one
+ * simulation step per sample, each mode of the mesh has an eigenvalue λ of
+ * the spring network (its graph Laplacian), and oscillates at
+ *
+ *     cos(ω) = 1 - (k/m)·λ/2      (ω in radians per sample)
+ *
+ * which is only stable while (k/m)·λ < 4 for every mode.  Adding masses
+ * lowers the smallest λ (and so the pitch), so each builder chooses k/m to
+ * hit a target fundamental frequency; more masses then add higher partials
+ * rather than lowering the pitch.
+ *
+ * The tension and mass sliders scale that k/m relative to their default
+ * positions, and the result is capped below the mesh's stability limit.
+ */
+/** Slider defaults in string.ts and pluck.ts; at these, a mesh plays at its built-in pitch */
+const REFERENCE_TENSION = 0.5;
+const REFERENCE_MASS = 10;
+const DEFAULT_DAMPING = 0.9998;
+/** Fraction of the stability limit that k/m may reach */
+const STABILITY_MARGIN = 0.95;
+/**
+ * Eigenvalue of the `mode`th mode (1-based) of a chain of `nFree` free masses
+ * whose two ends are attached to fixed masses
+ */
+const chainEigenvalue = (nFree, mode = 1) => 4 * Math.pow(Math.sin((mode * Math.PI) / (2 * (nFree + 1))), 2);
+/** The k/m that makes a mode with eigenvalue `lambda` sound at `hz` */
+const kOverMForFrequency = (hz, lambda) => {
+    const omega = (2 * Math.PI * hz) / sampleRate;
+    return (2 * (1 - Math.cos(omega))) / lambda;
 };
-// TODO: for-loop and out parameter
-const elementwiseAdd = (a, b, out) => {
-    for (let i = 0; i < a.length; i++) {
-        out[i] = a[i] + b[i];
-    }
-    return out;
-};
-const zerosLike = (x) => {
-    return new Float32Array(x.length).fill(0);
-};
-const randomLike = (x, magnitude = 1) => {
-    return zerosLike(x).map((x) => Math.random() * magnitude - magnitude / 2);
-};
-const vectorSum = (vec) => {
-    let total = 0;
-    for (let i = 0; i < vec.length; i++) {
-        total += vec[i];
-    }
-    return total;
-};
-const vectorScalarDivide = (vec, scalar) => {
-    for (let i = 0; i < vec.length; i++) {
-        vec[i] = vec[i] / scalar;
-    }
-    return vec;
-};
-const vectorScalarMultiply = (vec, scalar) => {
-    for (let i = 0; i < vec.length; i++) {
-        vec[i] = vec[i] * scalar;
-    }
-    return vec;
-};
-const l2Norm = (vec) => {
-    let norm = 0;
-    for (let i = 0; i < vec.length; i++) {
-        norm += Math.pow(vec[i], 2);
-    }
-    return Math.sqrt(norm);
-};
-const el1Norm = (vec) => {
-    let norm = 0;
-    for (let i = 0; i < vec.length; i++) {
-        norm += Math.abs(vec[i]);
-    }
-    return norm;
-};
-const distance = (a, b) => {
-    let distance = 0;
-    for (let i = 0; i < a.length; i++) {
-        distance += Math.pow((a[i] - b[i]), 2);
-    }
-    return Math.sqrt(distance);
-};
-const clamp = (value, min, max) => {
-    if (value < min) {
-        return min;
-    }
-    if (value > max) {
-        return max;
-    }
-    return value;
-};
+/**
+ * Description of a single mass, used only while building a mesh.  The
+ * simulation state lives in `SpringMesh`'s typed arrays.
+ */
 class Mass {
-    // TODO: damping should be a single value Float32Array
-    constructor(id, position, mass, damping, fixed = false) {
+    constructor(id, position, fixed = false) {
         this.id = id;
         this.position = position;
-        this.mass = mass;
-        this.damping = damping;
         this.fixed = fixed;
-        this.origPosition = null;
-        this.acceleration = null;
-        this.velocity = null;
-        this._diff = null;
-        this.origPosition = new Float32Array(position);
-        this.acceleration = zerosLike(position);
-        this.velocity = zerosLike(position);
-        this._diff = zerosLike(position);
-    }
-    // TODO: this allocates a new array each time.  Create a diff
-    // instance variable, update and return it here
-    get diff() {
-        return this._diff;
-    }
-    // TODO: This allocates a new array each time, update acceleration in place
-    applyForce(force) {
-        this.acceleration = elementwiseAdd(this.acceleration, vectorScalarDivide(force, this.mass), this.acceleration);
-    }
-    // TODO: This allocates a new array each time, update velocity in place
-    updateVelocity() {
-        this.velocity = elementwiseAdd(this.velocity, this.acceleration, this.velocity);
-    }
-    // TODO: This allocates a new array each time, update in place
-    updatePosition() {
-        if (this.fixed) {
-            return;
-        }
-        this.position = elementwiseAdd(this.position, this.velocity, this.position);
-    }
-    // TODO: This allocates a new array each time, update velocity in place
-    clear() {
-        this.velocity = vectorScalarMultiply(this.velocity, this.damping);
-        this.acceleration = this.acceleration.fill(0);
-        this._diff = elementwiseDifference(this.position, this.origPosition, this._diff);
     }
 }
+/**
+ * Description of a single spring, used only while building a mesh.
+ */
 class Spring {
-    // TODO: tension should be a single-value, Float32Array
-    constructor(m1, m2, tension) {
+    constructor(m1, m2) {
         this.m1 = m1;
         this.m2 = m2;
-        this.tension = tension;
-        this.m1Resting = elementwiseDifference(m1.position, m2.position, zerosLike(m1.position));
-        this.m2Resting = elementwiseDifference(m2.position, m1.position, zerosLike(m1.position));
-        this.scratchpad = zerosLike(m1.position);
-    }
-    get masses() {
-        return [this.m2, this.m2];
-    }
-    updateForces() {
-        // compute for m1
-        const current = elementwiseDifference(this.m1.position, this.m2.position, this.scratchpad);
-        const displacement = elementwiseDifference(this.m1Resting, current, this.scratchpad);
-        this.m1.applyForce(vectorScalarMultiply(displacement, this.tension));
-        // compute for m2
-        const c2 = elementwiseDifference(this.m2.position, this.m1.position, this.scratchpad);
-        const d2 = elementwiseDifference(this.m2Resting, c2, this.scratchpad);
-        this.m2.applyForce(vectorScalarMultiply(d2, this.tension));
-    }
-}
-class Force {
-    constructor(location, force) {
-        this.location = location;
-        this.force = force;
     }
 }
 class SpringMesh {
-    constructor(springs) {
-        this.springs = springs;
-        this.mostRecentMassContacted = null;
-        this.masses = Object.values(springs.reduce((accum, current) => {
-            accum[current.m1.id] = current.m1;
-            accum[current.m2.id] = current.m2;
-            return accum;
-        }, {}));
-    }
-    static compose(meshes) {
-        const allSprings = meshes.reduce((accum, current) => {
-            return [...accum, ...current.springs];
-        }, []);
-        return new SpringMesh(allSprings);
-    }
-    toMeshInfo() {
-        var _a, _b;
-        return {
-            masses: this.masses.map(({ position }) => ({ position })),
-            springs: this.springs.map(({ m1, m2 }) => ({
-                m1: m1.position,
-                m2: m2.position,
-            })),
-            struck: (_b = (_a = this.mostRecentMassContacted) === null || _a === void 0 ? void 0 : _a.position) !== null && _b !== void 0 ? _b : null,
-        };
-    }
-    adjustTension(newTension) {
-        this.springs.forEach((s) => (s.tension = newTension));
-    }
-    adjustMass(newMass) {
-        this.masses.forEach((m) => (m.mass = newMass));
-    }
-    adjustDamping(newDamping) {
-        this.masses.forEach((m) => (m.damping = newDamping));
-    }
-    findNearestMass(force) {
-        let smallestDistance = Number.MAX_VALUE;
-        let closestMassIndex = -1;
-        for (let i = 0; i < this.masses.length; i++) {
-            const m = this.masses[i];
-            const dist = distance(m.position, force.location);
-            if (dist < smallestDistance && !m.fixed) {
-                smallestDistance = dist;
-                closestMassIndex = i;
+    /**
+     * @param springs The springs (and, implicitly, masses) making up the mesh
+     * @param baseKOverM k/m when the tension and mass sliders are at their
+     * default positions; this sets the mesh's pitch
+     */
+    constructor(springs, baseKOverM) {
+        this.baseKOverM = baseKOverM;
+        // Slider values
+        this.tension = REFERENCE_TENSION;
+        this.mass = REFERENCE_MASS;
+        this.damping = DEFAULT_DAMPING;
+        this.struckIndex = -1;
+        const indexOf = new Map();
+        this.masses = [];
+        for (const { m1, m2 } of springs) {
+            for (const m of [m1, m2]) {
+                if (!indexOf.has(m)) {
+                    indexOf.set(m, this.masses.length);
+                    this.masses.push(m);
+                }
             }
         }
-        const nearest = this.masses[closestMassIndex];
-        this.mostRecentMassContacted = nearest;
-        return nearest;
+        const n = this.masses.length;
+        this.restX = new Float64Array(n);
+        this.restY = new Float64Array(n);
+        this.ux = new Float64Array(n);
+        this.uy = new Float64Array(n);
+        this.vx = new Float64Array(n);
+        this.vy = new Float64Array(n);
+        this.ax = new Float64Array(n);
+        this.ay = new Float64Array(n);
+        const free = [];
+        this.masses.forEach((m, i) => {
+            this.restX[i] = m.position[0];
+            this.restY[i] = m.position[1];
+            if (!m.fixed) {
+                free.push(i);
+            }
+        });
+        this.freeIndices = Int32Array.from(free);
+        const springA = [];
+        const springB = [];
+        const ground = [];
+        for (const { m1, m2 } of springs) {
+            const i = indexOf.get(m1);
+            const j = indexOf.get(m2);
+            if (!m1.fixed && !m2.fixed) {
+                springA.push(i);
+                springB.push(j);
+            }
+            else if (!m1.fixed) {
+                ground.push(i);
+            }
+            else if (!m2.fixed) {
+                ground.push(j);
+            }
+        }
+        this.springA = Int32Array.from(springA);
+        this.springB = Int32Array.from(springB);
+        this.groundIndices = Int32Array.from(ground);
+        // Bound the largest eigenvalue of the spring network (Gershgorin):
+        // for each free mass, (springs attached to it) + (springs to other
+        // free masses).  A spring from a mass to itself exerts no force.
+        const diagonal = new Float64Array(n);
+        const offDiagonal = new Float64Array(n);
+        for (let s = 0; s < springA.length; s++) {
+            const i = springA[s];
+            const j = springB[s];
+            if (i !== j) {
+                diagonal[i] += 1;
+                diagonal[j] += 1;
+                offDiagonal[i] += 1;
+                offDiagonal[j] += 1;
+            }
+        }
+        for (const i of ground) {
+            diagonal[i] += 1;
+        }
+        let maxEigenvalue = 0;
+        for (const i of free) {
+            maxEigenvalue = Math.max(maxEigenvalue, diagonal[i] + offDiagonal[i]);
+        }
+        this.maxKOverM =
+            maxEigenvalue > 0
+                ? (STABILITY_MARGIN * 4) / maxEigenvalue
+                : Number.POSITIVE_INFINITY;
+        this.updateStiffness();
+        this.displayPositions = this.masses.map((m) => new Float32Array(m.position));
+        this.massInfo = this.displayPositions.map((position) => ({
+            position,
+        }));
+        this.springInfo = springs.map(({ m1, m2 }) => ({
+            m1: this.displayPositions[indexOf.get(m1)],
+            m2: this.displayPositions[indexOf.get(m2)],
+        }));
     }
-    updateForces() {
-        for (const spring of this.springs) {
-            spring.updateForces();
+    /**
+     * Current positions of all masses and springs, for visualization.
+     *
+     * The returned structure is reused (and its arrays updated in place) on
+     * each call; postMessage() copies it.
+     */
+    toMeshInfo() {
+        const { displayPositions, restX, restY, ux, uy } = this;
+        for (let i = 0; i < displayPositions.length; i++) {
+            displayPositions[i][0] = restX[i] + ux[i];
+            displayPositions[i][1] = restY[i] + uy[i];
         }
+        return {
+            masses: this.massInfo,
+            springs: this.springInfo,
+            struck: this.struckIndex >= 0
+                ? displayPositions[this.struckIndex]
+                : null,
+        };
     }
-    secondPass() {
-        for (const mass of this.masses) {
-            mass.updateVelocity();
-            mass.updatePosition();
-            mass.clear();
-        }
+    setParameters({ tension, mass, damping }) {
+        this.tension = tension;
+        this.mass = mass;
+        this.damping = damping;
+        this.updateStiffness();
     }
-    simulationStep(force) {
-        if (force !== null) {
-            // compute any force applied from outside the system
-            const nearest = this.findNearestMass(force);
-            nearest.applyForce(force.force);
+    /**
+     * Scale the mesh's base k/m by the tension and mass sliders (relative to
+     * their defaults), capped below the stability limit
+     */
+    updateStiffness() {
+        const requested = this.baseKOverM *
+            (this.tension / REFERENCE_TENSION) *
+            (REFERENCE_MASS / this.mass);
+        this.kOverM = Math.min(requested, this.maxKOverM);
+    }
+    /**
+     * Index of the free mass nearest to `location`, or -1 if there are no
+     * free masses
+     */
+    findNearestMass(location) {
+        const { freeIndices, restX, restY, ux, uy } = this;
+        let smallestDistance = Number.MAX_VALUE;
+        let closest = -1;
+        for (let q = 0; q < freeIndices.length; q++) {
+            const i = freeIndices[q];
+            const dx = restX[i] + ux[i] - location[0];
+            const dy = restY[i] + uy[i] - location[1];
+            const dist = dx * dx + dy * dy;
+            if (dist < smallestDistance) {
+                smallestDistance = dist;
+                closest = i;
+            }
         }
-        // TODO: update forces needs to happen at once, but everything after that only depends
-        // on the forces already applied, so could be collapsed into a single loop.  Right now,
-        // this loops over all masses four times in total.  We only need two passes.
-        this.updateForces();
-        this.secondPass();
-        let outputSample = 0;
-        for (let i = 0; i < this.masses.length; i++) {
-            outputSample += this.masses[i].diff[0];
+        return closest;
+    }
+    /**
+     * Apply an external force to the mass nearest `location`.  It takes
+     * effect during the next simulation step.
+     */
+    strike(location, force) {
+        const i = this.findNearestMass(location);
+        if (i < 0) {
+            return;
         }
-        return Math.tanh(outputSample);
+        this.struckIndex = i;
+        this.ax[i] += force[0] / this.mass;
+        this.ay[i] += force[1] / this.mass;
+    }
+    /**
+     * Advance the simulation one step per sample of `output`, writing the
+     * (soft-clipped) total x displacement of all masses into it
+     */
+    render(output) {
+        const { ux, uy, vx, vy, ax, ay, springA, springB, groundIndices, freeIndices, } = this;
+        const kOverM = this.kOverM;
+        const damping = this.damping;
+        const nSprings = springA.length;
+        const nGround = groundIndices.length;
+        const nFree = freeIndices.length;
+        for (let t = 0; t < output.length; t++) {
+            // Spring forces: equal and opposite on each end
+            for (let s = 0; s < nSprings; s++) {
+                const i = springA[s];
+                const j = springB[s];
+                const fx = kOverM * (ux[j] - ux[i]);
+                const fy = kOverM * (uy[j] - uy[i]);
+                ax[i] += fx;
+                ax[j] -= fx;
+                ay[i] += fy;
+                ay[j] -= fy;
+            }
+            for (let s = 0; s < nGround; s++) {
+                const i = groundIndices[s];
+                ax[i] -= kOverM * ux[i];
+                ay[i] -= kOverM * uy[i];
+            }
+            // Integrate (velocity, then position, then damping), clear
+            // accumulated forces and sum the output in a single pass
+            let sample = 0;
+            for (let q = 0; q < nFree; q++) {
+                const i = freeIndices[q];
+                const nvx = vx[i] + ax[i];
+                const nvy = vy[i] + ay[i];
+                ux[i] += nvx;
+                uy[i] += nvy;
+                vx[i] = nvx * damping;
+                vy[i] = nvy * damping;
+                ax[i] = 0;
+                ay[i] = 0;
+                sample += ux[i];
+            }
+            output[t] = Math.tanh(sample);
+        }
     }
 }
-const buildRandom = (mass = 20, tension = 0.1, damping = 0.9998, nMasses = 64) => {
+/**
+ * Randomly-placed masses joined by randomly-chosen springs.  This has no
+ * well-defined fundamental, so it keeps the stiffness it has always had
+ * (tension 0.1, mass 20).
+ */
+const buildRandom = (nMasses = 64) => {
     const masses = [];
     for (let i = 0; i < nMasses; i++) {
         const position = new Float32Array([
             0.1 + Math.random() * 0.8,
             0.1 + Math.random() * 0.8,
         ]);
-        const m = new Mass(i.toString(), position, mass, damping, Math.random() > 0.9);
-        masses.push(m);
+        masses.push(new Mass(i.toString(), position, Math.random() > 0.9));
     }
     const springs = [];
     for (let i = 0; i < nMasses * 2; i++) {
         const m1 = masses[Math.floor(Math.random() * nMasses)];
         const m2 = masses[Math.floor(Math.random() * nMasses)];
-        const spring = new Spring(m1, m2, tension);
-        springs.push(spring);
+        springs.push(new Spring(m1, m2));
     }
-    return new SpringMesh(springs);
+    return new SpringMesh(springs, 0.1 / 20);
 };
-const buildPlate = (mass = 20, tension = 0.1, damping = 0.9998, width = 8) => {
+/**
+ * A square membrane of `width` x `width` masses, with its edges fixed
+ *
+ * @param fundamentalHz frequency of the lowest mode
+ */
+const buildPlate = (width = 24, fundamentalHz = 156) => {
     const isBoundary = (index) => index === 0 || index === width - 1;
-    const isOutOfBounds = (index) => index < 0 || index >= width;
-    const makeKey = ([i, j]) => `${i}_${j}`;
-    const parseKey = (key) => key.split('_').map((x) => parseInt(x));
-    function* iterPositions() {
-        for (let i = 0; i < width; i++) {
-            for (let j = 0; j < width; j++) {
-                yield [i, j];
+    const masses = [];
+    for (let i = 0; i < width; i++) {
+        const row = [];
+        for (let j = 0; j < width; j++) {
+            row.push(new Mass(`${i}_${j}`, new Float32Array([i / width, j / width]), isBoundary(i) || isBoundary(j)));
+        }
+        masses.push(row);
+    }
+    // Connect each mass to its right and lower neighbors (no diagonals),
+    // which creates each bi-directional connection exactly once
+    const springs = [];
+    for (let i = 0; i < width; i++) {
+        for (let j = 0; j < width; j++) {
+            if (j + 1 < width) {
+                springs.push(new Spring(masses[i][j], masses[i][j + 1]));
+            }
+            if (i + 1 < width) {
+                springs.push(new Spring(masses[i][j], masses[i + 1][j]));
             }
         }
     }
-    const masses = Array.from(iterPositions()).reduce((accum, [i, j]) => {
-        const newMass = new Mass(makeKey([i, j]), new Float32Array([i / width, j / width]), mass, damping, isBoundary(i) || isBoundary(j));
-        const key = makeKey([i, j]);
-        accum[key] = newMass;
-        return accum;
-    }, {});
-    function* iterNeighbors(x, y) {
-        for (let i = -1; i <= 1; i++) {
-            for (let j = -1; j <= 1; j++) {
-                if (i === 0 && j === 0) {
-                    // Don't connect to self
-                    continue;
-                }
-                if (Math.abs(i) + Math.abs(j) == 2) {
-                    // no diagonal connections
-                    continue;
-                }
-                const newX = x + i;
-                const newY = y + j;
-                if (isOutOfBounds(newX) || isOutOfBounds(newY)) {
-                    // don't connect to out-of-bounds neighbors
-                    // that don't exist
-                    continue;
-                }
-                yield [newX, newY];
-            }
-        }
-    }
-    const existing = new Set();
-    const springs = Object.values(masses).reduce((accum, current) => {
-        const [x, y] = parseKey(current.id);
-        const newSprings = [];
-        Array.from(iterNeighbors(x, y)).forEach(([i, j]) => {
-            const currentKey = makeKey([x, y]);
-            const neighborKey = makeKey([i, j]);
-            // Springs are bi-directional, once we've built a connection,
-            // it does not need to be revisited
-            const s1 = `${currentKey}_${neighborKey}`;
-            const s2 = `${neighborKey}_${currentKey}`;
-            if (existing.has(s1) || existing.has(s2)) {
-                return;
-            }
-            existing.add(s1);
-            existing.add(s2);
-            const neighborMass = masses[neighborKey];
-            console.log(`Connecting mass ${makeKey([i, j])} to mass ${neighborKey}`);
-            newSprings.push(new Spring(current, neighborMass, tension));
-        });
-        return [...accum, ...newSprings];
-    }, []);
-    const mesh = new SpringMesh(springs);
-    return mesh;
+    // The lowest mode of the grid is the lowest chain mode along each axis
+    const lowestEigenvalue = 2 * chainEigenvalue(width - 2);
+    return new SpringMesh(springs, kOverMForFrequency(fundamentalHz, lowestEigenvalue));
 };
-const buildString = (mass = 10, tension = 0.5, damping = 0.9998, nMasses = 64, xPos = 0.5, lengthCoefficient = 1, idPrefix = '') => {
-    // Create the masses
-    let masses = [];
+/**
+ * Springs for a single string of `nMasses` masses with both ends fixed
+ */
+const stringSprings = (nMasses, xPos, lengthCoefficient, idPrefix) => {
+    const masses = [];
     for (let i = 0; i < nMasses; i++) {
-        const newMass = new Mass(`${idPrefix}${i.toString()}`, new Float32Array([xPos, (i / nMasses) * lengthCoefficient]), mass, damping, i === 0 || i === nMasses - 1);
-        masses.push(newMass);
+        masses.push(new Mass(`${idPrefix}${i.toString()}`, new Float32Array([xPos, (i / nMasses) * lengthCoefficient]), i === 0 || i === nMasses - 1));
     }
-    let springs = [];
+    const springs = [];
     for (let i = 0; i < nMasses - 1; i++) {
-        const newSpring = new Spring(masses[i], masses[i + 1], tension);
-        springs.push(newSpring);
+        springs.push(new Spring(masses[i], masses[i + 1]));
     }
-    const mesh = new SpringMesh(springs);
-    return mesh;
+    return springs;
 };
-const buildMultiString = (mass = 10, tension = 0.5, damping = 0.9998, massesPerString = 8, nStrings = 10) => {
-    const meshes = [];
+/**
+ * A single string with both ends fixed
+ *
+ * @param fundamentalHz frequency of the lowest mode
+ */
+const buildString = (nMasses = 128, fundamentalHz = 39) => {
+    return new SpringMesh(stringSprings(nMasses, 0.5, 1, ''), kOverMForFrequency(fundamentalHz, chainEigenvalue(nMasses - 2)));
+};
+/**
+ * `nStrings` strings of increasing length, sharing a single stiffness.
+ * String `i` has `(3 + i) * massMultiplier` masses, so the strings' pitches
+ * are spread out by their lengths.
+ *
+ * @param lowestFundamentalHz fundamental of the longest string
+ */
+const buildMultiString = (massMultiplier = 2, nStrings = 10, lowestFundamentalHz = 223) => {
+    const massesInString = (i) => (3 + i) * massMultiplier;
+    const springs = [];
     for (let i = 0; i < nStrings; i++) {
-        const xPos = i / nStrings;
-        const lengthCoeff = (i + 1) / nStrings;
-        const sm = buildString(mass, tension, damping, 3 + i, xPos, lengthCoeff, `string${i}`);
-        meshes.push(sm);
+        springs.push(...stringSprings(massesInString(i), i / nStrings, (i + 1) / nStrings, `string${i}_`));
     }
-    const result = SpringMesh.compose(meshes);
-    console.log(result.masses);
-    return result;
+    const longest = massesInString(nStrings - 1);
+    return new SpringMesh(springs, kOverMForFrequency(lowestFundamentalHz, chainEigenvalue(longest - 2)));
 };
 class Physical extends AudioWorkletProcessor {
     constructor(options) {
@@ -339,7 +378,16 @@ class Physical extends AudioWorkletProcessor {
         this.eventQueue = [];
         this.mesh = null;
         this.samplesComputed = 0;
-        this.mesh = buildString();
+        /**
+         * Current slider values, kept here so they carry over when the model
+         * type changes
+         */
+        this.parameters = {
+            tension: REFERENCE_TENSION,
+            mass: REFERENCE_MASS,
+            damping: DEFAULT_DAMPING,
+        };
+        this.setMesh(buildString());
         this.port.postMessage(this.mesh.toMeshInfo());
         this.port.onmessage = (event) => {
             if (event.data.type === 'force-injection') {
@@ -347,29 +395,26 @@ class Physical extends AudioWorkletProcessor {
             }
             else if (event.data.type === 'adjust-parameter') {
                 const { name, value } = event.data;
-                if (name === 'mass') {
-                    this.mesh.adjustMass(value);
-                }
-                else if (name === 'tension') {
-                    this.mesh.adjustTension(value);
-                }
-                else if (name === 'damping') {
-                    this.mesh.adjustDamping(value);
+                if (name === 'mass' ||
+                    name === 'tension' ||
+                    name === 'damping') {
+                    this.parameters[name] = value;
+                    this.mesh.setParameters(this.parameters);
                 }
             }
             else if (event.data.type === 'model-type') {
                 const { value } = event.data;
                 if (value === 'plate') {
-                    this.mesh = buildPlate();
+                    this.setMesh(buildPlate());
                 }
                 else if (value === 'string') {
-                    this.mesh = buildString();
+                    this.setMesh(buildString());
                 }
                 else if (value === 'random') {
-                    this.mesh = buildRandom();
+                    this.setMesh(buildRandom());
                 }
                 else if (value === 'multi-string') {
-                    this.mesh = buildMultiString();
+                    this.setMesh(buildMultiString());
                 }
                 else {
                     throw new Error('Unsupported model type');
@@ -377,26 +422,19 @@ class Physical extends AudioWorkletProcessor {
             }
         };
     }
+    setMesh(mesh) {
+        mesh.setParameters(this.parameters);
+        this.mesh = mesh;
+    }
     process(inputs, outputs, parameters) {
         const left = outputs[0][0];
-        const nSteps = left.length;
-        // TODO: remove this, temporarily, to see if it affects the number
-        // of nodes I can compute
+        // At most one force injection per block, applied at its first sample
         const f = this.eventQueue.shift();
-        for (let i = 0; i < nSteps; i++) {
-            if (i === 0 && f !== undefined) {
-                // TODO: don't allocate this at all, or make it a mutable instance
-                // variable
-                const frce = new Force(f.location, f.force);
-                left[i] = this.mesh.simulationStep(frce);
-            }
-            else {
-                left[i] = this.mesh.simulationStep(null);
-            }
-            this.samplesComputed += 1;
+        if (f !== undefined) {
+            this.mesh.strike(f.location, f.force);
         }
-        // TODO: Is it possible to remove this from the process loop
-        // by making it a private async instance method?
+        this.mesh.render(left);
+        this.samplesComputed += left.length;
         if (this.samplesComputed % 1024 === 0) {
             this.port.postMessage(this.mesh.toMeshInfo());
         }
